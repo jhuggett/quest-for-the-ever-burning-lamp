@@ -84,9 +84,9 @@ function castLight(
         break;
       } else {
         // Our light beam is touching this square; light it:
-        if (dx * dx + dy * dy < radiusSquared) {
-          losCache.add(point);
-        }
+        losCache.add(point);
+        // if (dx * dx + dy * dy < radiusSquared) {
+        // }
 
         if (blocked) {
           // we're scanning a row of blocked squares:

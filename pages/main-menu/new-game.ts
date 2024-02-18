@@ -6,6 +6,11 @@ import { Page } from "../page";
 import { GamePage } from "../game";
 import { GameMap } from "../../data/models/game-map";
 import { Player } from "../../data/models/player";
+import { Monster } from "../../data/models/monster";
+
+const randomlyGet = <T>(array: T[]) => {
+  return array[Math.floor(Math.random() * array.length)];
+};
 
 export class NewGamePage extends Page<void> {
   beforeSetup() {
@@ -43,7 +48,25 @@ export class NewGamePage extends Page<void> {
           view_radius: 10,
         });
 
-        this.replace(new GamePage(this.root, this.shell, { save }));
+        for (let i = 0; i < 100; i++) {
+          const tile = randomlyGet(tiles);
+          Monster.create(db, {
+            save_id: save.props.id,
+            tile_id: tile.props.id,
+          });
+        }
+
+        const monsters = save.getMonsters(db);
+
+        this.replace(
+          new GamePage(this.root, this.shell, {
+            save,
+            player,
+            gameMap,
+            tiles,
+            monsters,
+          })
+        );
       },
     });
 

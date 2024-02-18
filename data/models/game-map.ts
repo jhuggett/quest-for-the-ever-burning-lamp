@@ -171,3 +171,22 @@ export class GameMap {
     });
   }
 }
+
+/*
+--Idea--
+
+High-Point Procedural Generation:
+
+Randomly select coordinates, set a random elevation (between 0.0 and 1.0). Keep track of these.
+
+Then at any point in the world, you can calculate it's elevation by calculating
+the distance to each of the high points, put into some inverse square linear function, and
+averaging them.
+
+In theory you can then get elevation/land data on demand for any point in the world, only needing
+reference to the "seed" high points.
+
+In theory this would avoid the need to smoothen the data (as is the case in the Growth Based Algorithm), as it would be smooth by nature.
+And it would calculate elevation up front.
+
+*/

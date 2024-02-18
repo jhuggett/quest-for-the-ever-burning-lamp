@@ -3,6 +3,7 @@ import { SelectComponent } from "../../components/select/select";
 import { Page } from "../page";
 import { Save } from "../../data/models/save";
 import { GamePage } from "../game";
+import { db } from "../..";
 
 export class LoadGamePage extends Page<{ saves: Save[] }> {
   beforeSetup() {
@@ -28,7 +29,20 @@ export class LoadGamePage extends Page<{ saves: Save[] }> {
       options: this.props.saves.map((save) => ({
         name: save.props.name,
         fn: () => {
-          this.replace(new GamePage(this.root, this.shell, { save }));
+          const player = save.getPlayer(db);
+          const monsters = save.getMonsters(db);
+          const gameMap = save.getGameMap(db);
+          const tiles = gameMap.getAllTiles(db);
+
+          this.replace(
+            new GamePage(this.root, this.shell, {
+              save,
+              player,
+              monsters,
+              gameMap,
+              tiles,
+            })
+          );
         },
       })),
       textForOption: (option) => option.name,

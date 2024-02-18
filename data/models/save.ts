@@ -2,6 +2,7 @@ import Database from "bun:sqlite";
 import { DBTable } from "../table";
 import { GameMap } from "./game-map";
 import { Player } from "./player";
+import { Monster } from "./monster";
 
 type SaveProps = {
   id: number;
@@ -50,5 +51,9 @@ export class Save {
 
   getPlayer(db: Database) {
     return Player.where(db, { save_id: this.props.id })[0];
+  }
+
+  getMonsters(db: Database) {
+    return Monster.where(db, { save_id: this.props.id });
   }
 }

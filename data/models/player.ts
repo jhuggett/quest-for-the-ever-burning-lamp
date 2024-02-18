@@ -1,8 +1,9 @@
 import Database from "bun:sqlite";
 import { DBTable } from "../table";
-import { MapTile } from "./map-tile";
+import { MapTile, MapTileManager } from "./map-tile";
 import { getVisiblePoints } from "../../shadowcast";
 import { XY } from "@jhuggett/terminal/xy";
+import { calculateFOV } from "../../field-of-view";
 
 type PlayerProps = {
   id: number;
@@ -53,46 +54,79 @@ export class Player {
     return rows.map((row) => new Player(row as PlayerProps));
   }
 
+  private tile: MapTile | undefined;
   getTile(db: Database) {
-    return MapTile.where(db, { id: this.props.tile_id })[0];
+    if (!this.tile)
+      this.tile = MapTile.where(db, { id: this.props.tile_id })[0];
+    return this.tile;
   }
 
-  visibleTiles(db: Database) {
+  setTile(tile: MapTile) {
+    if (this.tile) this.tile.isOccupied = false;
+
+    this.tile = tile;
+    this.props.tile_id = tile.props.id;
+
+    tile.isOccupied = true;
+  }
+
+  visibleTiles(db: Database, tileMapManger: MapTileManager) {
     const playerTile = this.getTile(db);
 
-    if (!playerTile) return [];
+    let tiles: MapTile[] = [];
 
-    const tiles = MapTile.where(db, {
-      game_map_id: playerTile.props.game_map_id,
-    });
+    try {
+      calculateFOV(
+        playerTile.xy,
+        (point: XY) => {
+          const tile = tileMapManger.getTile(point.x, point.y);
+          return !tile?.isTraversable() ?? false;
+        },
+        (point: XY) => {
+          const tile = tileMapManger.getTile(point.x, point.y);
+          if (tile) tiles.push(tile);
+        },
+        this.props.view_radius
+      );
+    } catch (e) {
+      console.error(e);
+    }
 
-    const tilesInViewDistance = tiles.filter((tile) => {
-      const distance = playerTile.distanceTo(tile);
+    return tiles;
 
-      return distance <= this.props.view_radius;
-    });
+    // const playerTile = this.getTile(db);
 
-    const tilesMap = new Map<string, MapTile>(
-      tilesInViewDistance.map((tile) => [
-        `${tile.props.x},${tile.props.y}`,
-        tile,
-      ])
-    );
+    // if (!playerTile) return [];
 
-    const visibleTiles = getVisiblePoints(
-      {
-        x: playerTile.props.x,
-        y: playerTile.props.y,
-      },
-      (point: XY) => {
-        const tile = tilesMap.get(`${point.x},${point.y}`);
+    // const tilesInViewDistance = tiles.filter((tile) => {
+    //   const distance = playerTile.distanceTo(tile);
 
-        if (!tile) return false;
+    //   return distance <= this.props.view_radius;
+    // });
 
-        return !tile.props.is_wall;
-      },
-      this.props.view_radius
-    );
+    // const tilesMap = new Map<string, MapTile>(
+    //   tilesInViewDistance.map((tile) => [
+    //     `${tile.props.x},${tile.props.y}`,
+    //     tile,
+    //   ])
+    // );
+
+    // const visibleTiles = getVisiblePoints(
+    //   {
+    //     x: playerTile.props.x,
+    //     y: playerTile.props.y,
+    //   },
+    //   (point: XY) => {
+    //     const tile = tilesMap.get(`${point.x},${point.y}`);
+
+    //     if (!tile) return false;
+
+    //     return tile?.isTraversable() ?? false;
+    //   },
+    //   this.props.view_radius
+    // );
+
+    // --------
 
     // const visibleTiles = tilesInViewDistance.filter((tile) => {
     //   const x1 = playerTile.props.x;
@@ -128,12 +162,14 @@ export class Player {
     //   return true;
     // });
 
-    const x = Array.from(visibleTiles)
-      .map((point) => {
-        return tilesMap.get(`${point.x},${point.y}`);
-      })
-      .filter((tile) => tile !== undefined) as MapTile[];
+    // ----
 
-    return x;
+    // const x = Array.from(visibleTiles)
+    //   .map((point) => {
+    //     return tilesMap.get(`${point.x},${point.y}`);
+    //   })
+    //   .filter((tile) => tile !== undefined) as MapTile[];
+
+    // return x;
   }
 }
