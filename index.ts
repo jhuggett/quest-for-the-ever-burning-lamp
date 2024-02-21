@@ -72,7 +72,8 @@ konsole.log("general", "info", "Starting main menu");
 try {
   await mainMenu.serve();
 } catch (error) {
-  konsole.log("general", "error", error);
+  //konsole.log("general", "error", error);
+  console.error(error);
 }
 
 shell.showCursor(true);

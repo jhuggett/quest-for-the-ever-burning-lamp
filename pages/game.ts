@@ -1,13 +1,26 @@
 import { within } from "@jhuggett/terminal/bounds/bounds";
 import { Page } from "./page";
 import { Save } from "../data/models/save";
-import { blue, gray, red, yellow } from "@jhuggett/terminal";
+import { black, blue, gray, red, yellow, RGB } from "@jhuggett/terminal";
 import { db, konsole } from "..";
 import { MapTile, MapTileManager } from "../data/models/map-tile";
 import { Monster } from "../data/models/monster";
 import { Player } from "../data/models/player";
 import { GameMap } from "../data/models/game-map";
 import { SubscribableEvent } from "@jhuggett/terminal/subscribable-event";
+
+class Color implements RGB {
+  constructor(
+    public r: number,
+    public g: number,
+    public b: number,
+    public a: number = 1
+  ) {}
+
+  darkenTo(amount: number) {
+    return new Color(this.r * amount, this.g * amount, this.b * amount, this.a);
+  }
+}
 
 export type GamePageProps = {
   save: Save;
@@ -106,6 +119,9 @@ export class GamePage extends Page<GamePageProps> {
       };
 
       for (const tile of visibleTiles) {
+        const distanceToPlayer = playerTile.distanceTo(tile);
+        if (distanceToPlayer > player.props.view_radius) continue;
+
         const x = tile.props.x * 2 - center.x * 2;
         const y = tile.props.y - center.y;
 
@@ -129,11 +145,15 @@ export class GamePage extends Page<GamePageProps> {
           cursor.moveTo({ x, y });
           if (tile.props.is_wall) {
             cursor.write("  ", {
-              backgroundColor: yellow(tileBrightness),
+              backgroundColor: new Color(120, 110, 100).darkenTo(
+                tileBrightness
+              ),
             });
           } else {
             cursor.write("  ", {
-              backgroundColor: gray(tileBrightness),
+              backgroundColor: new Color(220, 210, 200).darkenTo(
+                tileBrightness
+              ),
             });
           }
         }
@@ -163,8 +183,9 @@ export class GamePage extends Page<GamePageProps> {
           );
 
           cursor.moveTo({ x, y });
-          cursor.write("  ", {
-            backgroundColor: blue(tileBrightness),
+          cursor.write("••", {
+            backgroundColor: new Color(20, 30, 10).darkenTo(tileBrightness),
+            foregroundColor: new Color(200, 20, 10),
           });
         }
       }
@@ -174,8 +195,9 @@ export class GamePage extends Page<GamePageProps> {
         y: centerOffset.y,
       });
 
-      cursor.write("  ", {
-        backgroundColor: red(0.9),
+      cursor.write("••", {
+        foregroundColor: new Color(0, 200, 10),
+        backgroundColor: new Color(80, 60, 50),
       });
     };
 

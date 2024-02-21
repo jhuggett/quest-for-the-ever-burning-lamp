@@ -14,7 +14,7 @@ export class MainMenuPage extends Page<void> {
       {}
     );
     title.renderer = ({ cursor }) => {
-      cursor.write("Yep, it's a game", {
+      cursor.write("Quest for the Ever-Burning Lamp", {
         foregroundColor: { r: 100, g: 100, b: 255, a: 1 },
         bold: true,
       });
