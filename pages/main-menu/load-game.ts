@@ -30,9 +30,9 @@ export class LoadGamePage extends Page<{ saves: Save[] }> {
         name: save.props.name,
         fn: () => {
           const player = save.getPlayer(db);
-          const monsters = save.getMonsters(db);
-          const gameMap = save.getGameMap(db);
+          const gameMap = player.getGameMap(db)!;
           const tiles = gameMap.getAllTiles(db);
+          const monsters = gameMap.getMonsters(db);
 
           this.replace(
             new GamePage(this.root, this.shell, {

@@ -8,6 +8,9 @@ import { Monster } from "../data/models/monster";
 import { Player } from "../data/models/player";
 import { GameMap } from "../data/models/game-map";
 import { SubscribableEvent } from "@jhuggett/terminal/subscribable-event";
+import { OutOfBoundsError } from "@jhuggett/terminal/cursors/cursor";
+import { Exit } from "../data/models/exit";
+import { randomlyGet } from "./main-menu/new-game";
 
 class Color implements RGB {
   constructor(
@@ -150,11 +153,17 @@ export class GamePage extends Page<GamePageProps> {
               ),
             });
           } else {
-            cursor.write("  ", {
-              backgroundColor: new Color(220, 210, 200).darkenTo(
-                tileBrightness
-              ),
-            });
+            if (tile.attachedExit(db)) {
+              cursor.write("  ", {
+                backgroundColor: new Color(250, 0, 0).darkenTo(tileBrightness),
+              });
+            } else {
+              cursor.write("  ", {
+                backgroundColor: new Color(220, 210, 200).darkenTo(
+                  tileBrightness
+                ),
+              });
+            }
           }
         }
       }
@@ -239,9 +248,18 @@ export class GamePage extends Page<GamePageProps> {
     gameLoop.addLoop({
       interval: 50,
       callback: () => {
-        view.render();
+        try {
+          view.render();
 
-        this.shell.render();
+          this.shell.render();
+        } catch (e) {
+          if (e instanceof OutOfBoundsError) {
+            // ignore
+            // we should sort this out though
+          } else {
+            throw e;
+          }
+        }
       },
     });
 
@@ -256,7 +274,7 @@ export class GamePage extends Page<GamePageProps> {
 
     for (const monster of monsters) {
       gameLoop.addLoop({
-        interval: Math.floor(Math.random() * 500) + 100,
+        interval: Math.floor(Math.random() * 500) + 500,
         callback: () => {
           const playerTile = player.getTile(db);
 
@@ -268,11 +286,66 @@ export class GamePage extends Page<GamePageProps> {
     view.focus();
 
     const movePlayer = (x: number, y: number) => {
-      const tileAbove = mapTileManager.getTile(x, y);
+      const potentialTile = mapTileManager.getTile(x, y);
 
-      if (tileAbove?.isTraversable()) {
-        player.setTile(tileAbove);
-        player.props.view_radius = Math.max(0, player.props.view_radius - 0.1);
+      if (potentialTile?.isTraversable()) {
+        player.setTile(potentialTile);
+        const potentialTileExit = potentialTile.attachedExit(db);
+        if (potentialTileExit) {
+          gameLoop.stop();
+
+          // create map
+          const gameMap = potentialTileExit.getToMap(db);
+          const nextMap = GameMap.create(db, { save_id: save.props.id });
+
+          // generate tiles
+          gameMap.generateTiles(db);
+          const tiles = gameMap.getAllTiles(db);
+
+          // choose entrance
+          const entranceTile = randomlyGet(
+            tiles.filter((tile) => !tile.props.is_wall)
+          );
+          potentialTileExit.props.to_map_tile_id = entranceTile.props.id;
+          potentialTileExit.save(db);
+
+          // place player
+          player.setTile(entranceTile);
+          player.save(db);
+
+          // create exit
+          const exitTile = randomlyGet(
+            tiles.filter((tile) => !tile.props.is_wall)
+          );
+          Exit.create(db, {
+            from_map_id: gameMap.props.id,
+            to_map_id: nextMap.props.id,
+            from_map_tile_id: exitTile.props.id,
+          });
+
+          // create monsters
+          for (let i = 0; i < 10; i++) {
+            const tile = randomlyGet(
+              tiles.filter((tile) => !tile.props.is_wall)
+            );
+            Monster.create(db, {
+              save_id: save.props.id,
+              tile_id: tile.props.id,
+            });
+          }
+
+          const monsters = gameMap.getMonsters(db);
+
+          this.replace(
+            new GamePage(this.root, this.shell, {
+              save,
+              player,
+              gameMap,
+              tiles,
+              monsters,
+            })
+          );
+        }
       }
     };
 

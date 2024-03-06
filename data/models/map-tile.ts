@@ -1,5 +1,7 @@
 import Database from "bun:sqlite";
 import { DBTable } from "../table";
+import { Exit } from "./exit";
+import { GameMap } from "./game-map";
 
 type MapTileProps = {
   id: number;
@@ -136,6 +138,26 @@ export class MapTile {
 
   save(db: Database) {
     MapTile.table(db).updateRow(this.props.id, this.props);
+  }
+
+  private _attachedExit?: Exit | null;
+  attachedExit(db: Database): Exit | null {
+    if (this._attachedExit === undefined) {
+      // NOTE: this won't show an exit if you're on the other side of it,
+      // we'd need to also check the to_map_tile_id.
+      const exits = Exit.table(db).where({ from_map_tile_id: this.props.id });
+      if (exits.length > 0) {
+        this._attachedExit = new Exit(exits[0]);
+      } else {
+        this._attachedExit = null;
+      }
+    }
+
+    return this._attachedExit;
+  }
+
+  getGameMap(db: Database) {
+    return GameMap.table(db).getRow(this.props.game_map_id);
   }
 
   adjacentUp: MapTile | undefined | null;

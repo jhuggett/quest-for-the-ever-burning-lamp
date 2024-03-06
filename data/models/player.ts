@@ -4,6 +4,7 @@ import { MapTile, MapTileManager } from "./map-tile";
 import { getVisiblePoints } from "../../shadowcast";
 import { XY } from "@jhuggett/terminal/xy";
 import { calculateFOV } from "../../field-of-view";
+import { GameMap } from "./game-map";
 
 type PlayerProps = {
   id: number;
@@ -68,6 +69,11 @@ export class Player {
     this.props.tile_id = tile.props.id;
 
     tile.isOccupied = true;
+  }
+
+  getGameMap(db: Database) {
+    const gameMap = this.getTile(db)?.getGameMap(db);
+    return gameMap ? new GameMap(gameMap) : null;
   }
 
   visibleTiles(db: Database, tileMapManger: MapTileManager) {

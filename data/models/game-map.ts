@@ -2,6 +2,7 @@ import Database from "bun:sqlite";
 import { DBTable } from "../table";
 import { MapTile } from "./map-tile";
 import { XY } from "@jhuggett/terminal/xy";
+import { Monster, MonsterProps } from "./monster";
 
 type GameMapProps = {
   id: number;
@@ -27,8 +28,6 @@ export class GameMap {
     if (row === null) throw new Error("Could not find created GameMap");
 
     const gameMap = new GameMap(row);
-
-    gameMap.generateTiles(db);
 
     return gameMap;
   }
@@ -88,7 +87,7 @@ export class GameMap {
 
     let growthPoints = [{ x: 0, y: 0 }];
 
-    while (growthPoints.length > 0 && grownPoints.length < 10000) {
+    while (growthPoints.length > 0 && grownPoints.length < 1000) {
       let nextGrowthPoints: XY[] = [];
 
       for (const growthPoint of growthPoints) {
@@ -169,6 +168,16 @@ export class GameMap {
         is_wall: wallPointsSet.has(xyToKey(point)),
       });
     });
+  }
+
+  getMonsters(db: Database) {
+    const monsters = db
+      .query(
+        `select monsters.* from monsters join map_tiles on monsters.tile_id = map_tiles.id join game_maps on map_tiles.game_map_id = game_maps.id where game_maps.id = ${this.props.id}`
+      )
+      .all() as MonsterProps[];
+
+    return monsters.map((monster) => new Monster(monster));
   }
 }
 

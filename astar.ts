@@ -25,7 +25,12 @@ export class AStarNode<T extends XY<T>> {
   }
 }
 
-export const astar = <T extends XY<T>>(start: T, end: T) => {
+export const astar = <T extends XY<T>>(
+  start: T,
+  end: T,
+  maxSearchDepth?: number
+) => {
+  let searchDepth = 0;
   const startNode = new AStarNode(start);
   const endNode = new AStarNode(end);
 
@@ -33,6 +38,9 @@ export const astar = <T extends XY<T>>(start: T, end: T) => {
   const closedSet: AStarNode<T>[] = [];
 
   while (openSet.length > 0) {
+    if (maxSearchDepth && searchDepth > maxSearchDepth) {
+      return [];
+    }
     let currentIndex = 0;
     let currentNode = openSet[0];
 
@@ -107,6 +115,8 @@ export const astar = <T extends XY<T>>(start: T, end: T) => {
         (child.value.x() - endNode.value.x()) ** 2 +
         (child.value.y() - endNode.value.y()) ** 2;
       child.f = child.g + child.h;
+
+      searchDepth++;
 
       openSet.push(child);
     }

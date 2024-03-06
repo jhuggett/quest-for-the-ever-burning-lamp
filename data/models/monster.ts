@@ -4,7 +4,7 @@ import { MapTile, MapTileManager } from "./map-tile";
 import { astar } from "../../astar";
 import { konsole } from "../..";
 
-type MonsterProps = {
+export type MonsterProps = {
   id: number;
 
   save_id: number;
@@ -89,9 +89,25 @@ export class Monster {
 
     // this.setTile(closestTile);
 
-    const path = astar(monsterTile, playerTile);
+    const path = astar(monsterTile, playerTile, 500);
 
-    if (!path || path.length < 1) return;
+    if (!path || path.length < 1) {
+      const adjacentTiles = monsterTile.adjacentTiles();
+
+      if (adjacentTiles.length === 0) return;
+
+      const closestTile = adjacentTiles.sort((a, b) => {
+        const distanceToA = a.distanceTo(playerTile);
+        const distanceToB = b.distanceTo(playerTile);
+
+        return distanceToA - distanceToB;
+      })[0];
+
+      if (!closestTile.isTraversable()) return;
+
+      this.setTile(closestTile);
+      return;
+    }
 
     this.setTile(path[0]);
 

@@ -7,8 +7,9 @@ import { GamePage } from "../game";
 import { GameMap } from "../../data/models/game-map";
 import { Player } from "../../data/models/player";
 import { Monster } from "../../data/models/monster";
+import { Exit } from "../../data/models/exit";
 
-const randomlyGet = <T>(array: T[]) => {
+export const randomlyGet = <T>(array: T[]) => {
   return array[Math.floor(Math.random() * array.length)];
 };
 
@@ -38,25 +39,41 @@ export class NewGamePage extends Page<void> {
           name: value,
         });
 
+        // create map
         const gameMap = GameMap.create(db, { save_id: save.props.id });
+        const nextMap = GameMap.create(db, { save_id: save.props.id });
 
+        // generate tiles
+        gameMap.generateTiles(db);
         const tiles = gameMap.getAllTiles(db);
 
+        // create exit
+        const exitTile = randomlyGet(
+          tiles.filter((tile) => !tile.props.is_wall)
+        );
+        Exit.create(db, {
+          from_map_id: gameMap.props.id,
+          to_map_id: nextMap.props.id,
+          from_map_tile_id: exitTile.props.id,
+        });
+
+        // create player
         const player = Player.create(db, {
           save_id: save.props.id,
           tile_id: tiles[0].props.id,
           view_radius: 10,
         });
 
-        for (let i = 0; i < 100; i++) {
-          const tile = randomlyGet(tiles);
+        // create monsters
+        for (let i = 0; i < 10; i++) {
+          const tile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
           Monster.create(db, {
             save_id: save.props.id,
             tile_id: tile.props.id,
           });
         }
 
-        const monsters = save.getMonsters(db);
+        const monsters = gameMap.getMonsters(db);
 
         this.replace(
           new GamePage(this.root, this.shell, {
