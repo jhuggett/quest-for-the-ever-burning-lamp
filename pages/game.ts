@@ -11,6 +11,7 @@ import { SubscribableEvent } from "@jhuggett/terminal/subscribable-event";
 import { OutOfBoundsError } from "@jhuggett/terminal/cursors/cursor";
 import { Exit } from "../data/models/exit";
 import { randomlyGet } from "./main-menu/new-game";
+import { Item } from "../data/models/item";
 
 class Color implements RGB {
   constructor(
@@ -158,11 +159,37 @@ export class GamePage extends Page<GamePageProps> {
                 backgroundColor: new Color(250, 0, 0).darkenTo(tileBrightness),
               });
             } else {
-              cursor.write("  ", {
-                backgroundColor: new Color(220, 210, 200).darkenTo(
-                  tileBrightness
-                ),
-              });
+              if (tile.getItems(db).length > 0) {
+                const item = tile.getItems(db)[0];
+                switch (item.props.item_type) {
+                  case "breadcrumb":
+                    cursor.write(item.variant > 0.5 ? ". " : " .", {
+                      foregroundColor: new Color(120, 110, 130).darkenTo(
+                        tileBrightness
+                      ),
+                      backgroundColor: new Color(220, 210, 200).darkenTo(
+                        tileBrightness
+                      ),
+                    });
+                    break;
+                  case "oil": // ▗▖ ▐▍
+                    cursor.write("▗▖", {
+                      foregroundColor: new Color(200, 110, 130).darkenTo(
+                        tileBrightness
+                      ),
+                      backgroundColor: new Color(220, 210, 200).darkenTo(
+                        tileBrightness
+                      ),
+                    });
+                    break;
+                }
+              } else {
+                cursor.write("  ", {
+                  backgroundColor: new Color(220, 210, 200).darkenTo(
+                    tileBrightness
+                  ),
+                });
+              }
             }
           }
         }
@@ -237,6 +264,22 @@ export class GamePage extends Page<GamePageProps> {
       cursor.write(" | ");
 
       cursor.write(`View Radius: ${player.props.view_radius.toFixed(2)}`);
+
+      cursor.write(" | ");
+
+      cursor.write(`Save: ${save.props.name}`);
+
+      cursor.write(" | ");
+
+      cursor.write(`Level: ${this.props.gameMap.props.level}`);
+
+      cursor.write(" | ");
+
+      cursor.write(`Monsters: ${monsters.length}`);
+
+      cursor.write(" | ");
+
+      cursor.write(`Tiles: ${tiles.length}`);
     };
 
     statsView.render();
@@ -290,21 +333,29 @@ export class GamePage extends Page<GamePageProps> {
 
       if (potentialTile?.isTraversable()) {
         player.setTile(potentialTile);
+
+        if (potentialTile.getItems(db).length > 0) {
+          const item = potentialTile.getItems(db)[0];
+          if (item.props.item_type === "oil") {
+            item.delete(db);
+
+            potentialTile.refetchItems(db);
+
+            player.props.view_radius += 2;
+          }
+        }
+
         const potentialTileExit = potentialTile.attachedExit(db);
         if (potentialTileExit) {
           gameLoop.stop();
 
-          // create map
           const gameMap = potentialTileExit.getToMap(db);
-          const nextMap = GameMap.create(db, { save_id: save.props.id });
 
-          // generate tiles
-          gameMap.generateTiles(db);
-          const tiles = gameMap.getAllTiles(db);
+          const { monsters, tiles } = gameMap.generateLevel(db, save);
 
           // choose entrance
           const entranceTile = randomlyGet(
-            tiles.filter((tile) => !tile.props.is_wall)
+            tiles.filter((tile) => !tile.isTraversable())
           );
           potentialTileExit.props.to_map_tile_id = entranceTile.props.id;
           potentialTileExit.save(db);
@@ -312,29 +363,6 @@ export class GamePage extends Page<GamePageProps> {
           // place player
           player.setTile(entranceTile);
           player.save(db);
-
-          // create exit
-          const exitTile = randomlyGet(
-            tiles.filter((tile) => !tile.props.is_wall)
-          );
-          Exit.create(db, {
-            from_map_id: gameMap.props.id,
-            to_map_id: nextMap.props.id,
-            from_map_tile_id: exitTile.props.id,
-          });
-
-          // create monsters
-          for (let i = 0; i < 10; i++) {
-            const tile = randomlyGet(
-              tiles.filter((tile) => !tile.props.is_wall)
-            );
-            Monster.create(db, {
-              save_id: save.props.id,
-              tile_id: tile.props.id,
-            });
-          }
-
-          const monsters = gameMap.getMonsters(db);
 
           this.replace(
             new GamePage(this.root, this.shell, {
@@ -379,12 +407,27 @@ export class GamePage extends Page<GamePageProps> {
       player.save(db);
     });
 
-    view.on("Space", () => {
+    view.on("p", () => {
       if (gameLoop.isRunning) {
         gameLoop.stop();
       } else {
         gameLoop.start();
       }
+    });
+
+    view.on("Space", () => {
+      const playerTile = player.getTile(db);
+
+      if (playerTile.getItems(db).length > 0) {
+        return;
+      }
+
+      Item.create(db, {
+        item_type: "breadcrumb",
+        tile_id: playerTile.props.id,
+      });
+
+      playerTile.refetchItems(db);
     });
 
     gameLoop.start();

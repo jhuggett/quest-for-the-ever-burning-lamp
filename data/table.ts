@@ -95,4 +95,10 @@ export abstract class DBTable<
 
     return this.getRow(id);
   }
+
+  deleteRow(id: number) {
+    this.db
+      .query(`DELETE FROM ${this.tableName} WHERE id = $id`)
+      .run({ $id: id });
+  }
 }

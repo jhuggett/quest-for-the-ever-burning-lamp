@@ -3,10 +3,16 @@ import { DBTable } from "../table";
 import { MapTile } from "./map-tile";
 import { XY } from "@jhuggett/terminal/xy";
 import { Monster, MonsterProps } from "./monster";
+import { Exit } from "./exit";
+import { randomlyGet } from "../../pages/main-menu/new-game";
+import { Player } from "./player";
+import { Save } from "./save";
+import { Item } from "./item";
 
 type GameMapProps = {
   id: number;
   save_id: number;
+  level: number;
 };
 
 export type CreateGameMapProps = Omit<GameMapProps, "id">;
@@ -87,7 +93,10 @@ export class GameMap {
 
     let growthPoints = [{ x: 0, y: 0 }];
 
-    while (growthPoints.length > 0 && grownPoints.length < 1000) {
+    while (
+      growthPoints.length > 0 &&
+      grownPoints.length < 1000 + 1000 * this.props.level
+    ) {
       let nextGrowthPoints: XY[] = [];
 
       for (const growthPoint of growthPoints) {
@@ -97,7 +106,8 @@ export class GameMap {
 
         visitedPoints.add(key);
 
-        const shouldGrow = Math.random() >= 0.4 || grownPoints.length === 0;
+        const shouldGrow =
+          Math.random() >= 0.4 || nextGrowthPoints.length === 0;
 
         if (shouldGrow) {
           grownPointsSet.add(key);
@@ -178,6 +188,51 @@ export class GameMap {
       .all() as MonsterProps[];
 
     return monsters.map((monster) => new Monster(monster));
+  }
+
+  generateLevel(db: Database, save: Save) {
+    // create map
+
+    const nextMap = GameMap.create(db, {
+      save_id: save.props.id,
+      level: this.props.level + 1,
+    });
+
+    // generate tiles
+    this.generateTiles(db);
+    const tiles = this.getAllTiles(db);
+
+    // create exit
+    const exitTile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
+    Exit.create(db, {
+      from_map_id: this.props.id,
+      to_map_id: nextMap.props.id,
+      from_map_tile_id: exitTile.props.id,
+    });
+
+    // create monsters
+    for (let i = 0; i < 10 + 10 * this.props.level; i++) {
+      const tile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
+      Monster.create(db, {
+        save_id: save.props.id,
+        tile_id: tile.props.id,
+      });
+    }
+
+    const monsters = this.getMonsters(db);
+
+    for (let i = 0; i < 10 + 10 * this.props.level; i++) {
+      Item.create(db, {
+        item_type: "oil",
+        tile_id: randomlyGet(tiles.filter((tile) => !tile.props.is_wall)).props
+          .id,
+      });
+    }
+
+    return {
+      tiles,
+      monsters,
+    };
   }
 }
 

@@ -40,40 +40,19 @@ export class NewGamePage extends Page<void> {
         });
 
         // create map
-        const gameMap = GameMap.create(db, { save_id: save.props.id });
-        const nextMap = GameMap.create(db, { save_id: save.props.id });
-
-        // generate tiles
-        gameMap.generateTiles(db);
-        const tiles = gameMap.getAllTiles(db);
-
-        // create exit
-        const exitTile = randomlyGet(
-          tiles.filter((tile) => !tile.props.is_wall)
-        );
-        Exit.create(db, {
-          from_map_id: gameMap.props.id,
-          to_map_id: nextMap.props.id,
-          from_map_tile_id: exitTile.props.id,
+        const gameMap = GameMap.create(db, {
+          save_id: save.props.id,
+          level: 0,
         });
+
+        const { tiles, monsters } = gameMap.generateLevel(db, save);
 
         // create player
         const player = Player.create(db, {
           save_id: save.props.id,
           tile_id: tiles[0].props.id,
-          view_radius: 10,
+          view_radius: 15,
         });
-
-        // create monsters
-        for (let i = 0; i < 10; i++) {
-          const tile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
-          Monster.create(db, {
-            save_id: save.props.id,
-            tile_id: tile.props.id,
-          });
-        }
-
-        const monsters = gameMap.getMonsters(db);
 
         this.replace(
           new GamePage(this.root, this.shell, {

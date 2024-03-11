@@ -2,6 +2,7 @@ import Database from "bun:sqlite";
 import { DBTable } from "../table";
 import { Exit } from "./exit";
 import { GameMap } from "./game-map";
+import { Item } from "./item";
 
 type MapTileProps = {
   id: number;
@@ -154,6 +155,21 @@ export class MapTile {
     }
 
     return this._attachedExit;
+  }
+
+  private _items: Item[] | undefined;
+  getItems(db: Database) {
+    if (this._items === undefined) {
+      this._items = Item.table(db)
+        .where({ tile_id: this.props.id })
+        .map((row) => new Item(row));
+    }
+    return this._items;
+  }
+
+  refetchItems(db: Database) {
+    this._items = undefined;
+    return this.getItems(db);
   }
 
   getGameMap(db: Database) {
