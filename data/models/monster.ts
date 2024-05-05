@@ -1,8 +1,7 @@
 import Database from "bun:sqlite";
 import { DBTable } from "../table";
-import { MapTile, MapTileManager } from "./map-tile";
+import { MapTile } from "./map-tile";
 import { astar } from "../../astar";
-import { konsole } from "../..";
 
 export type MonsterProps = {
   id: number;
@@ -18,45 +17,47 @@ class MonstersTable extends DBTable<CreateMonsterProps, MonsterProps> {
 }
 
 export class Monster {
-  static table(db: Database) {
-    return new MonstersTable(db);
-  }
+  static table = new MonstersTable();
 
   constructor(public props: MonsterProps) {}
 
-  save(db: Database) {
-    Monster.table(db).updateRow(this.props.id, this.props);
+  save() {
+    return Monster.table.updateRow(this.props.id, this.props);
   }
 
-  static create(db: Database, payload: CreateMonsterProps) {
-    const row = Monster.table(db).createRow(payload);
+  static async create(payload: CreateMonsterProps) {
+    const row = await Monster.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created Monster");
 
     return new Monster(row);
   }
 
-  static find(db: Database, id: number) {
-    const row = Monster.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await Monster.table.getRow(id);
     return new Monster(row as MonsterProps);
   }
 
-  static all(db: Database) {
-    const rows = Monster.table(db).allRows();
+  static async all() {
+    const rows = await Monster.table.allRows();
     return rows.map((row) => new Monster(row as MonsterProps));
   }
 
-  static where(db: Database, props: Partial<MonsterProps>) {
-    const rows = Monster.table(db).where(props);
+  static async where(props: Partial<MonsterProps>) {
+    const rows = await Monster.table.where(props);
     return rows.map((row) => new Monster(row as MonsterProps));
   }
 
   private tile: MapTile | undefined;
-  getTile(db: Database) {
+  async getTile() {
     if (!this.tile) {
-      this.tile = MapTile.where(db, { id: this.props.tile_id })[0];
+      this.tile = (await MapTile.where({ id: this.props.tile_id }))[0];
     }
 
+    return this.tile;
+  }
+
+  get cachedTile() {
     return this.tile;
   }
 
@@ -69,8 +70,8 @@ export class Monster {
     tile.isOccupied = true;
   }
 
-  moveTowardsPlayer(db: Database, playerTile: MapTile) {
-    const monsterTile = this.getTile(db);
+  async moveTowardsPlayer(playerTile: MapTile) {
+    const monsterTile = await this.getTile();
 
     if (!monsterTile) return;
 

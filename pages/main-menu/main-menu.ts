@@ -3,7 +3,6 @@ import { SelectComponent } from "../../components/select/select";
 import { Page } from "../page";
 import { NewGamePage } from "./new-game";
 import { SettingsPage } from "./settings";
-import { db } from "../..";
 import { Save } from "../../data/models/save";
 import { LoadGamePage } from "./load-game";
 
@@ -14,14 +13,15 @@ export class MainMenuPage extends Page<void> {
       {}
     );
     title.renderer = ({ cursor }) => {
-      cursor.write("Quest for the Ever-Burning Lamp", {
+      cursor.newLine();
+      cursor.write("  Quest for the Ever-Burning Lamp", {
         foregroundColor: { r: 100, g: 100, b: 255, a: 1 },
         bold: true,
       });
     };
 
     const container = this.root.createChildElement(
-      () => below(title, within(this.root, { height: 20 })),
+      () => below(title, within(this.root, { height: 20, paddingLeft: 2 })),
       {}
     );
 
@@ -46,22 +46,24 @@ export class MainMenuPage extends Page<void> {
       },
     ];
 
-    const allSaves = Save.all(db);
+    Save.all().then((saves) => {
+      if (saves.length > 0) {
+        options.unshift({
+          name: "Load Game",
+          fn: () => {
+            this.push(
+              new LoadGamePage(this.root, this.shell, { saves: saves })
+            );
+          },
+        });
 
-    if (allSaves.length > 0) {
-      options.unshift({
-        name: "Load Game",
-        fn: () => {
-          this.push(
-            new LoadGamePage(this.root, this.shell, { saves: allSaves })
-          );
-        },
-      });
-    }
+        select.element.render();
+        this.shell.render();
+      }
+    });
 
     const select = new SelectComponent({
       container,
-      label: "Main Menu:",
       options,
       textForOption: (option) => option.name,
       onSelect: (option) => option.fn?.(),

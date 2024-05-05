@@ -5,9 +5,9 @@ import { XY } from "@jhuggett/terminal/xy";
 import { Monster, MonsterProps } from "./monster";
 import { Exit } from "./exit";
 import { randomlyGet } from "../../pages/main-menu/new-game";
-import { Player } from "./player";
 import { Save } from "./save";
 import { Item } from "./item";
+import { konsole } from "../..";
 
 type GameMapProps = {
   id: number;
@@ -22,14 +22,12 @@ class GameMapsTable extends DBTable<CreateGameMapProps, GameMapProps> {
 }
 
 export class GameMap {
-  static table(db: Database) {
-    return new GameMapsTable(db);
-  }
+  static table = new GameMapsTable();
 
   constructor(public props: GameMapProps) {}
 
-  static create(db: Database, payload: CreateGameMapProps) {
-    const row = GameMap.table(db).createRow(payload);
+  static async create(payload: CreateGameMapProps) {
+    const row = await GameMap.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created GameMap");
 
@@ -38,22 +36,22 @@ export class GameMap {
     return gameMap;
   }
 
-  static find(db: Database, id: number) {
-    const row = GameMap.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await GameMap.table.getRow(id);
     return new GameMap(row as GameMapProps);
   }
 
-  static all(db: Database) {
-    const rows = GameMap.table(db).allRows();
+  static async all() {
+    const rows = await GameMap.table.allRows();
     return rows.map((row) => new GameMap(row as GameMapProps));
   }
 
-  getAllTiles(db: Database) {
-    return MapTile.where(db, { game_map_id: this.props.id });
+  getAllTiles() {
+    return MapTile.where({ game_map_id: this.props.id });
   }
 
-  getTilesWithinRadius(db: Database, x: number, y: number, radius: number) {
-    const tiles = this.getAllTiles(db);
+  async getTilesWithinRadius(x: number, y: number, radius: number) {
+    const tiles = await this.getAllTiles();
 
     const tilesWithinRadius = tiles.filter((tile) => {
       const distance = Math.sqrt(
@@ -65,12 +63,12 @@ export class GameMap {
     return tilesWithinRadius;
   }
 
-  static where(db: Database, props: Partial<GameMapProps>) {
-    const rows = GameMap.table(db).where(props);
+  static async where(props: Partial<GameMapProps>) {
+    const rows = await GameMap.table.where(props);
     return rows.map((row) => new GameMap(row as GameMapProps));
   }
 
-  generateTiles(db: Database) {
+  async generateTiles() {
     let grownPoints: XY[] = [];
 
     const visitedPoints = new Set<string>();
@@ -170,59 +168,73 @@ export class GameMap {
       wallPointsSet.add(key);
     }
 
-    const tiles = grownPoints.map((point) => {
-      return MapTile.create(db, {
+    for (const point of grownPoints) {
+      await MapTile.create({
         game_map_id: this.props.id,
         x: point.x,
         y: point.y,
         is_wall: wallPointsSet.has(xyToKey(point)),
       });
-    });
+    }
   }
 
-  getMonsters(db: Database) {
-    const monsters = db
-      .query(
-        `select monsters.* from monsters join map_tiles on monsters.tile_id = map_tiles.id join game_maps on map_tiles.game_map_id = game_maps.id where game_maps.id = ${this.props.id}`
-      )
-      .all() as MonsterProps[];
+  async getMonsters() {
+    const monsters = (await GameMap.table.rawQuery(
+      `select monsters.* from monsters join map_tiles on monsters.tile_id = map_tiles.id join game_maps on map_tiles.game_map_id = game_maps.id where game_maps.id = ${this.props.id}`
+    )) as MonsterProps[];
 
     return monsters.map((monster) => new Monster(monster));
   }
 
-  generateLevel(db: Database, save: Save) {
+  async generateLevel(save: Save) {
     // create map
+    konsole.log("general", "info", `Generating level ${this.props.level}`);
 
-    const nextMap = GameMap.create(db, {
+    konsole.log("general", "info", "Creating next map");
+
+    const nextMap = await GameMap.create({
       save_id: save.props.id,
       level: this.props.level + 1,
     });
 
+    konsole.log("general", "info", "Generating tiles");
+
     // generate tiles
-    this.generateTiles(db);
-    const tiles = this.getAllTiles(db);
+    await this.generateTiles();
+    const tiles = await this.getAllTiles();
 
     // create exit
     const exitTile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
-    Exit.create(db, {
+    konsole.log(
+      "general",
+      "info",
+      `Creating exit ${{
+        from_map_id: this.props.id,
+        to_map_id: nextMap.props.id,
+        from_map_tile_id: exitTile.props.id,
+      }}`
+    );
+    await Exit.create({
       from_map_id: this.props.id,
       to_map_id: nextMap.props.id,
       from_map_tile_id: exitTile.props.id,
     });
 
+    konsole.log("general", "info", "Creating monsters");
+
     // create monsters
     for (let i = 0; i < 10 + 10 * this.props.level; i++) {
       const tile = randomlyGet(tiles.filter((tile) => !tile.props.is_wall));
-      Monster.create(db, {
+      await Monster.create({
         save_id: save.props.id,
         tile_id: tile.props.id,
       });
     }
 
-    const monsters = this.getMonsters(db);
+    const monsters = await this.getMonsters();
 
     for (let i = 0; i < 10 + 10 * this.props.level; i++) {
-      Item.create(db, {
+      await Item.create({
         item_type: "oil",
         tile_id: randomlyGet(tiles.filter((tile) => !tile.props.is_wall)).props
           .id,

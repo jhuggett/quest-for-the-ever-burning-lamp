@@ -1,17 +1,19 @@
 import { within } from "@jhuggett/terminal/bounds/bounds";
-import { Page } from "./page";
-import { Save } from "../data/models/save";
-import { black, blue, gray, red, yellow, RGB } from "@jhuggett/terminal";
-import { db, konsole } from "..";
-import { MapTile, MapTileManager } from "../data/models/map-tile";
-import { Monster } from "../data/models/monster";
-import { Player } from "../data/models/player";
-import { GameMap } from "../data/models/game-map";
+import { Page } from "../page";
+import { Save } from "../../data/models/save";
+import { RGB } from "@jhuggett/terminal";
+import { konsole } from "../..";
+import { MapTile, MapTileManager } from "../../data/models/map-tile";
+import { Monster } from "../../data/models/monster";
+import { Player } from "../../data/models/player";
+import { GameMap } from "../../data/models/game-map";
 import { SubscribableEvent } from "@jhuggett/terminal/subscribable-event";
 import { OutOfBoundsError } from "@jhuggett/terminal/cursors/cursor";
-import { Exit } from "../data/models/exit";
-import { randomlyGet } from "./main-menu/new-game";
-import { Item } from "../data/models/item";
+import { randomlyGet } from "../main-menu/new-game";
+import { Item } from "../../data/models/item";
+import { LoadingPage } from "../loading-page";
+import { Element } from "@jhuggett/terminal/elements/element";
+import { PauseMenu } from "./pause-menu";
 
 class Color implements RGB {
   constructor(
@@ -32,6 +34,7 @@ export type GamePageProps = {
   player: Player;
   tiles: MapTile[];
   gameMap: GameMap;
+  mapTileManager: MapTileManager;
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,34 +86,23 @@ class GameLoop {
   onPausedChange: SubscribableEvent<boolean> = new SubscribableEvent();
 }
 
-export class GamePage extends Page<GamePageProps> {
-  beforeSetup(): void {
-    const view = this.root.createChildElement(() => within(this.root), {});
+class Game {
+  gameLoop = new GameLoop();
 
-    const { save, monsters, player, tiles } = this.props;
+  view: Element<{}> | null = null;
 
-    const mapTileManager = new MapTileManager(tiles);
+  mount(view: Element<{}>, gamePage: GamePage, pause: () => void) {
+    const { save, monsters, player, tiles, mapTileManager } = gamePage.props;
 
-    for (const monster of monsters) {
-      // to maintain the same tile references
-      const tile = monster.getTile(db);
-      const monsterTile = mapTileManager.getTile(tile.props.x, tile.props.y);
-      if (monsterTile) monster.setTile(monsterTile);
-    }
-
-    const playerTile = player.getTile(db);
-    const playerMapTile = mapTileManager.getTile(
-      playerTile.props.x,
-      playerTile.props.y
-    );
-    if (playerMapTile) player.setTile(playerMapTile);
+    this.view = view;
 
     view.renderer = ({ cursor }) => {
       cursor.fill(" ");
 
-      const visibleTiles = player.visibleTiles(db, mapTileManager);
+      const visibleTiles = player.visibleTiles(mapTileManager);
+      const playerTile = player.cachedTile;
 
-      const playerTile = player.getTile(db);
+      if (!playerTile) return;
 
       const centerOffset = {
         x: Math.floor(view.bounds.width / 4),
@@ -154,13 +146,13 @@ export class GamePage extends Page<GamePageProps> {
               ),
             });
           } else {
-            if (tile.attachedExit(db)) {
+            if (tile.cachedAttachedExit) {
               cursor.write("  ", {
                 backgroundColor: new Color(250, 0, 0).darkenTo(tileBrightness),
               });
             } else {
-              if (tile.getItems(db).length > 0) {
-                const item = tile.getItems(db)[0];
+              if (tile.cachedItems && tile.cachedItems.length > 0) {
+                const item = tile.cachedItems[0];
                 switch (item.props.item_type) {
                   case "breadcrumb":
                     cursor.write(item.variant > 0.5 ? ". " : " .", {
@@ -196,7 +188,9 @@ export class GamePage extends Page<GamePageProps> {
       }
 
       for (const monster of monsters) {
-        const monsterTile = monster.getTile(db);
+        const monsterTile = monster.cachedTile;
+
+        if (!monsterTile) continue;
 
         const x = monsterTile.props.x * 2 - center.x * 2;
         const y = monsterTile.props.y - center.y;
@@ -239,8 +233,6 @@ export class GamePage extends Page<GamePageProps> {
 
     view.render();
 
-    const gameLoop = new GameLoop();
-
     const statsView = view.createChildElement(
       () =>
         within(view, {
@@ -259,7 +251,7 @@ export class GamePage extends Page<GamePageProps> {
 
       cursor.properties.bold = true;
 
-      cursor.write(`${gameLoop.isRunning ? "Running" : "Paused"}`);
+      cursor.write(`${this.gameLoop.isRunning ? "Running" : "Paused"}`);
 
       cursor.write(" | ");
 
@@ -271,7 +263,7 @@ export class GamePage extends Page<GamePageProps> {
 
       cursor.write(" | ");
 
-      cursor.write(`Level: ${this.props.gameMap.props.level}`);
+      cursor.write(`Level: ${gamePage.props.gameMap.props.level}`);
 
       cursor.write(" | ");
 
@@ -284,17 +276,17 @@ export class GamePage extends Page<GamePageProps> {
 
     statsView.render();
 
-    gameLoop.onPausedChange.subscribe((paused) => {
+    this.gameLoop.onPausedChange.subscribe((paused) => {
       statsView.render();
     });
 
-    gameLoop.addLoop({
+    this.gameLoop.addLoop({
       interval: 50,
       callback: () => {
         try {
           view.render();
 
-          this.shell.render();
+          gamePage.shell.render();
         } catch (e) {
           if (e instanceof OutOfBoundsError) {
             // ignore
@@ -306,7 +298,7 @@ export class GamePage extends Page<GamePageProps> {
       },
     });
 
-    gameLoop.addLoop({
+    this.gameLoop.addLoop({
       interval: 250,
       callback: () => {
         player.props.view_radius = Math.max(0, player.props.view_radius - 0.1);
@@ -316,120 +308,169 @@ export class GamePage extends Page<GamePageProps> {
     });
 
     for (const monster of monsters) {
-      gameLoop.addLoop({
+      this.gameLoop.addLoop({
         interval: Math.floor(Math.random() * 500) + 500,
         callback: () => {
-          const playerTile = player.getTile(db);
+          const playerTile = player.cachedTile;
 
-          monster.moveTowardsPlayer(db, playerTile);
+          if (!playerTile) return;
+
+          monster.moveTowardsPlayer(playerTile);
         },
       });
     }
 
     view.focus();
 
-    const movePlayer = (x: number, y: number) => {
+    const movePlayer = async (x: number, y: number) => {
       const potentialTile = mapTileManager.getTile(x, y);
 
       if (potentialTile?.isTraversable()) {
         player.setTile(potentialTile);
 
-        if (potentialTile.getItems(db).length > 0) {
-          const item = potentialTile.getItems(db)[0];
+        if (potentialTile.cachedItems && potentialTile.cachedItems.length > 0) {
+          const item = potentialTile.cachedItems[0];
           if (item.props.item_type === "oil") {
-            item.delete(db);
-
-            potentialTile.refetchItems(db);
-
+            await item.delete();
+            await potentialTile.refetchItems();
             player.props.view_radius += 2;
           }
         }
 
-        const potentialTileExit = potentialTile.attachedExit(db);
+        const potentialTileExit = potentialTile.cachedAttachedExit;
         if (potentialTileExit) {
-          gameLoop.stop();
+          this.gameLoop.stop();
 
-          const gameMap = potentialTileExit.getToMap(db);
+          const loadingPage = new LoadingPage(gamePage.root, gamePage.shell, {
+            action: async (setMessage) => {
+              setMessage("You descend ever deeper into the darkness.");
 
-          const { monsters, tiles } = gameMap.generateLevel(db, save);
+              konsole.log("general", "info", "Generating next level");
+              const gameMap = await potentialTileExit.getToMap();
 
-          // choose entrance
-          const entranceTile = randomlyGet(
-            tiles.filter((tile) => !tile.isTraversable())
-          );
-          potentialTileExit.props.to_map_tile_id = entranceTile.props.id;
-          potentialTileExit.save(db);
+              konsole.log("general", "info", "Generating next level tiles");
+              const { monsters, tiles } = await gameMap.generateLevel(save);
 
-          // place player
-          player.setTile(entranceTile);
-          player.save(db);
+              // choose entrance
+              const entranceTile = randomlyGet(
+                tiles.filter((tile) => !tile.isTraversable())
+              );
+              potentialTileExit.props.to_map_tile_id = entranceTile.props.id;
+              konsole.log("general", "info", "Saving exit");
+              await potentialTileExit.save();
 
-          this.replace(
-            new GamePage(this.root, this.shell, {
-              save,
-              player,
-              gameMap,
-              tiles,
-              monsters,
-            })
-          );
+              // place player
+              player.setTile(entranceTile);
+              konsole.log("general", "info", "Saving player");
+              await player.save();
+
+              const mapTileManager = new MapTileManager(tiles);
+              konsole.log("general", "info", "Setting up map tile manager");
+              await mapTileManager.setup({ monsters, player });
+
+              konsole.log("general", "info", "Returning game page");
+              return new GamePage(gamePage.root, gamePage.shell, {
+                save,
+                player,
+                gameMap,
+                tiles,
+                monsters,
+                mapTileManager,
+              });
+            },
+          });
+
+          gamePage.replace(loadingPage);
+
+          return;
         }
+
+        if (potentialTile.cachedItems && potentialTile.cachedItems.length > 0) {
+          return;
+        }
+
+        await Item.create({
+          item_type: "breadcrumb",
+          tile_id: potentialTile.props.id,
+        });
+
+        await potentialTile.refetchItems();
       }
     };
 
     view.on("Arrow Up", () => {
-      const playerTile = player.getTile(db);
+      const playerTile = player.cachedTile;
+      if (!playerTile) return;
       movePlayer(playerTile.props.x, playerTile.props.y - 1);
     });
 
     view.on("Arrow Down", () => {
-      const playerTile = player.getTile(db);
+      const playerTile = player.cachedTile;
+      if (!playerTile) return;
       movePlayer(playerTile.props.x, playerTile.props.y + 1);
     });
 
     view.on("Arrow Left", () => {
-      const playerTile = player.getTile(db);
+      const playerTile = player.cachedTile;
+      if (!playerTile) return;
       movePlayer(playerTile.props.x - 1, playerTile.props.y);
     });
 
     view.on("Arrow Right", () => {
-      const playerTile = player.getTile(db);
+      const playerTile = player.cachedTile;
+      if (!playerTile) return;
       movePlayer(playerTile.props.x + 1, playerTile.props.y);
     });
 
-    this.root.on("Escape", () => {
-      gameLoop.stop();
-      this.pop();
+    gamePage.root.on("Escape", () => {
+      // this.gameLoop.stop();
+      // gamePage.pop();
+
+      pause();
     });
 
     view.on("+", () => {
       player.props.view_radius = 50; // Math.min(50, player.props.view_radius + 0.5);
-      player.save(db);
+      player.save();
     });
 
     view.on("p", () => {
-      if (gameLoop.isRunning) {
-        gameLoop.stop();
+      if (this.gameLoop.isRunning) {
+        this.gameLoop.stop();
       } else {
-        gameLoop.start();
+        this.gameLoop.start();
       }
     });
 
-    view.on("Space", () => {
-      const playerTile = player.getTile(db);
+    this.gameLoop.start();
+  }
 
-      if (playerTile.getItems(db).length > 0) {
-        return;
-      }
+  focus() {
+    this.view?.focus();
+  }
+}
 
-      Item.create(db, {
-        item_type: "breadcrumb",
-        tile_id: playerTile.props.id,
-      });
+export class GamePage extends Page<GamePageProps> {
+  beforeSetup(): void {
+    const view = this.root.createChildElement(() => within(this.root), {});
 
-      playerTile.refetchItems(db);
+    const game = new Game();
+
+    game.mount(view, this, () => {
+      konsole.log("general", "info", "Pausing game");
+      game.gameLoop.stop();
+      pauseMenu.show();
     });
 
-    gameLoop.start();
+    const pauseMenu = new PauseMenu();
+
+    pauseMenu.mount(view, this, () => {
+      konsole.log("general", "info", "Resuming game");
+
+      pauseMenu.menuBox?.clearThisAndEverythingAbove();
+
+      game.gameLoop.start();
+      game.focus();
+    });
   }
 }

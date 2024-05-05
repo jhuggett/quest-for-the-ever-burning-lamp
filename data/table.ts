@@ -1,4 +1,4 @@
-import Database from "bun:sqlite";
+import { db } from "..";
 
 export abstract class DBTable<
   TCreateProps extends object,
@@ -6,99 +6,57 @@ export abstract class DBTable<
 > {
   abstract tableName: string;
 
-  constructor(public db: Database) {}
+  constructor() {}
 
   lastRowId() {
-    const rowid = this.db
-      .query("SELECT last_insert_rowid()")
-      .values()?.[0]?.[0];
-
-    if (typeof rowid !== "number") {
-      throw new Error("Could not get last inserted rowid");
-    }
-
-    return rowid as number;
+    return db.do("lastRowId", undefined);
   }
 
-  getRow(id: number) {
-    const row = this.db
-      .query(`SELECT * FROM ${this.tableName} WHERE id = $id`)
-      .get({ $id: id });
-
-    if (row === null) return null;
-
-    return row as TPayload;
+  async getRow(id: number) {
+    return (await db.do("getRow", {
+      id,
+      tableName: this.tableName,
+    })) as TPayload;
   }
 
-  createRow(props: TCreateProps) {
-    const columns = Object.keys(props);
-    const values = Object.values(props);
-
-    const columnsString = columns.join(", ");
-    const columnsStringWith$ = columns.map((column) => `$${column}`).join(", ");
-
-    this.db
-      .query(
-        `INSERT INTO ${this.tableName} (${columnsString}) VALUES (${columnsStringWith$})`
-      )
-      .run(
-        Object.fromEntries(
-          columns.map((column, i) => [`$${column}`, values[i]])
-        )
-      );
-
-    const rowid = this.lastRowId();
-
-    return this.getRow(rowid);
+  async createRow(props: TCreateProps) {
+    return (await db.do("createRow", {
+      tableName: this.tableName,
+      props,
+    })) as TPayload;
   }
 
-  allRows() {
-    return this.db.query(`SELECT * FROM ${this.tableName}`).all() as TPayload[];
+  async allRows() {
+    return (await db.do("allRows", {
+      tableName: this.tableName,
+    })) as TPayload[];
   }
 
-  where(props: Partial<TPayload>) {
-    const columns = Object.keys(props);
-    const values = Object.values(props);
-
-    const conditions = columns
-      .map((column) => `${column} = $${column}`)
-      .join(" AND ");
-
-    const query = this.db.query(
-      `SELECT * FROM ${this.tableName} WHERE ${conditions}`
-    );
-    const results = query.all(
-      Object.fromEntries(
-        columns.map((column, i) => [`$${column}`, values[i]])
-      ) as any
-    ) as TPayload[];
-
-    return results;
+  async where(props: Partial<TPayload>) {
+    return (await db.do("where", {
+      tableName: this.tableName,
+      props,
+    })) as TPayload[];
   }
 
-  updateRow(id: number, props: Partial<TPayload>) {
-    const columns = Object.keys(props);
-    const values = Object.values(props);
-
-    const conditions = columns
-      .map((column) => `${column} = $${column}`)
-      .join(", ");
-
-    const query = this.db.query(
-      `UPDATE ${this.tableName} SET ${conditions} WHERE id = $id`
-    );
-    query.run(
-      Object.fromEntries(
-        columns.map((column, i) => [`$${column}`, values[i]])
-      ) as any
-    );
-
-    return this.getRow(id);
+  async updateRow(id: number, props: Partial<TPayload>) {
+    return (await db.do("updateRow", {
+      id,
+      tableName: this.tableName,
+      props,
+    })) as TPayload;
   }
 
   deleteRow(id: number) {
-    this.db
-      .query(`DELETE FROM ${this.tableName} WHERE id = $id`)
-      .run({ $id: id });
+    return db.do("deleteRow", {
+      id,
+      tableName: this.tableName,
+    });
+  }
+
+  rawQuery(query: string) {
+    return db.do("rawQuery", {
+      query,
+    });
   }
 }

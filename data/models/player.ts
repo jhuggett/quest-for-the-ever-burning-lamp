@@ -22,43 +22,45 @@ class PlayersTable extends DBTable<CreatePlayerProps, PlayerProps> {
 }
 
 export class Player {
-  static table(db: Database) {
-    return new PlayersTable(db);
-  }
+  static table = new PlayersTable();
 
   constructor(public props: PlayerProps) {}
 
-  save(db: Database) {
-    Player.table(db).updateRow(this.props.id, this.props);
+  save() {
+    return Player.table.updateRow(this.props.id, this.props);
   }
 
-  static create(db: Database, payload: CreatePlayerProps) {
-    const row = Player.table(db).createRow(payload);
+  static async create(payload: CreatePlayerProps) {
+    const row = await Player.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created Player");
 
     return new Player(row);
   }
 
-  static find(db: Database, id: number) {
-    const row = Player.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await Player.table.getRow(id);
     return new Player(row as PlayerProps);
   }
 
-  static all(db: Database) {
-    const rows = Player.table(db).allRows();
+  static async all() {
+    const rows = await Player.table.allRows();
     return rows.map((row) => new Player(row as PlayerProps));
   }
 
-  static where(db: Database, props: Partial<PlayerProps>) {
-    const rows = Player.table(db).where(props);
+  static async where(props: Partial<PlayerProps>) {
+    const rows = await Player.table.where(props);
     return rows.map((row) => new Player(row as PlayerProps));
   }
 
   private tile: MapTile | undefined;
-  getTile(db: Database) {
+  async getTile() {
     if (!this.tile)
-      this.tile = MapTile.where(db, { id: this.props.tile_id })[0];
+      this.tile = (await MapTile.where({ id: this.props.tile_id }))[0];
+    return this.tile;
+  }
+
+  get cachedTile() {
     return this.tile;
   }
 
@@ -71,13 +73,15 @@ export class Player {
     tile.isOccupied = true;
   }
 
-  getGameMap(db: Database) {
-    const gameMap = this.getTile(db)?.getGameMap(db);
+  async getGameMap() {
+    const gameMap = await (await this.getTile()).getGameMap();
     return gameMap ? new GameMap(gameMap) : null;
   }
 
-  visibleTiles(db: Database, tileMapManger: MapTileManager) {
-    const playerTile = this.getTile(db);
+  visibleTiles(tileMapManger: MapTileManager) {
+    const playerTile = this.cachedTile;
+
+    if (!playerTile) return [];
 
     let tiles: MapTile[] = [];
 

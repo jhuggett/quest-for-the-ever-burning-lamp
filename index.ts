@@ -2,7 +2,6 @@ import { BunShell } from "@jhuggett/terminal";
 import { getDBConnection } from "./data/database";
 import { MainMenuPage } from "./pages/main-menu/main-menu";
 import { Debug } from "./debug";
-import { within } from "@jhuggett/terminal/bounds/bounds";
 
 export const db = await getDBConnection();
 export const konsole = new Debug();
@@ -20,7 +19,7 @@ shell.onWindowResize(() => {
   shell.render();
 });
 
-const debugMode = false;
+const debugMode = true;
 
 let content = root.createChildElement(() => {
   return {
@@ -67,15 +66,12 @@ if (debugMode) {
 
 const mainMenu = new MainMenuPage(content, shell);
 
-konsole.log("general", "info", "Starting main menu");
-
 try {
   await mainMenu.serve();
 } catch (error) {
-  //konsole.log("general", "error", error);
   console.error(error);
 }
 
 shell.showCursor(true);
 
-db.close();
+db.shutdown();

@@ -3,11 +3,14 @@ import { db } from "../..";
 import { TextInputComponent } from "../../components/text-input/text-input";
 import { Save } from "../../data/models/save";
 import { Page } from "../page";
-import { GamePage } from "../game";
+import { GamePage } from "../game/game";
 import { GameMap } from "../../data/models/game-map";
 import { Player } from "../../data/models/player";
 import { Monster } from "../../data/models/monster";
 import { Exit } from "../../data/models/exit";
+import { LoadingPage } from "../loading-page";
+import { sleep } from "bun";
+import { MapTileManager } from "../../data/models/map-tile";
 
 export const randomlyGet = <T>(array: T[]) => {
   return array[Math.floor(Math.random() * array.length)];
@@ -35,34 +38,45 @@ export class NewGamePage extends Page<void> {
       container,
       label: "Save Name:",
       onSubmit: async (value) => {
-        const save = Save.create(db, {
-          name: value,
+        const loadingPage = new LoadingPage(this.root, this.shell, {
+          action: async (setMessage) => {
+            setMessage("Into deep darkness you descend.");
+
+            const save = await Save.create({
+              name: value,
+            });
+
+            // create map
+            const gameMap = await GameMap.create({
+              save_id: save.props.id,
+              level: 0,
+            });
+
+            const { tiles, monsters } = await gameMap.generateLevel(save);
+
+            // create player
+            const player = await Player.create({
+              save_id: save.props.id,
+              tile_id: tiles[0].props.id,
+              view_radius: 15,
+            });
+
+            const mapTileManager = new MapTileManager(tiles);
+
+            await mapTileManager.setup({ monsters, player });
+
+            return new GamePage(this.root, this.shell, {
+              save,
+              player,
+              gameMap,
+              tiles,
+              monsters,
+              mapTileManager,
+            });
+          },
         });
 
-        // create map
-        const gameMap = GameMap.create(db, {
-          save_id: save.props.id,
-          level: 0,
-        });
-
-        const { tiles, monsters } = gameMap.generateLevel(db, save);
-
-        // create player
-        const player = Player.create(db, {
-          save_id: save.props.id,
-          tile_id: tiles[0].props.id,
-          view_radius: 15,
-        });
-
-        this.replace(
-          new GamePage(this.root, this.shell, {
-            save,
-            player,
-            gameMap,
-            tiles,
-            monsters,
-          })
-        );
+        this.replace(loadingPage);
       },
     });
 

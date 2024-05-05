@@ -3,7 +3,7 @@ import { DBTable } from "../table";
 
 export type ItemType = "oil" | "breadcrumb" | "everlasting lamp";
 
-type ItemProps = {
+export type ItemProps = {
   id: number;
   item_type: ItemType;
   tile_id: number;
@@ -16,40 +16,41 @@ class ItemsTable extends DBTable<CreateItemProps, ItemProps> {
 }
 
 export class Item {
-  static table(db: Database) {
-    return new ItemsTable(db);
+  static table = new ItemsTable();
+
+  props: ItemProps;
+  constructor(props: ItemProps) {
+    this.props = {
+      id: props.id,
+      item_type: props.item_type,
+      tile_id: props.tile_id,
+    };
   }
 
-  constructor(public props: ItemProps) {}
-
-  Item(db: Database) {
-    Item.table(db).updateRow(this.props.id, this.props);
-  }
-
-  static create(db: Database, payload: CreateItemProps) {
-    const row = Item.table(db).createRow(payload);
+  static async create(payload: CreateItemProps) {
+    const row = await Item.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created Item");
 
     return new Item(row);
   }
 
-  static find(db: Database, id: number) {
-    const row = Item.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await Item.table.getRow(id);
     return new Item(row as ItemProps);
   }
 
-  static all(db: Database) {
-    const rows = Item.table(db).allRows();
+  static async all() {
+    const rows = await Item.table.allRows();
     return rows.map((row) => new Item(row as ItemProps));
   }
 
-  save(db: Database) {
-    Item.table(db).updateRow(this.props.id, this.props);
+  save() {
+    return Item.table.updateRow(this.props.id, this.props);
   }
 
-  delete(db: Database) {
-    Item.table(db).deleteRow(this.props.id);
+  delete() {
+    return Item.table.deleteRow(this.props.id);
   }
 
   variant = Math.random();

@@ -2,8 +2,10 @@ import { within, below } from "@jhuggett/terminal/bounds/bounds";
 import { SelectComponent } from "../../components/select/select";
 import { Page } from "../page";
 import { Save } from "../../data/models/save";
-import { GamePage } from "../game";
+import { GamePage } from "../game/game";
 import { db } from "../..";
+import { MapTileManager } from "../../data/models/map-tile";
+import { LoadingPage } from "../loading-page";
 
 export class LoadGamePage extends Page<{ saves: Save[] }> {
   beforeSetup() {
@@ -28,21 +30,33 @@ export class LoadGamePage extends Page<{ saves: Save[] }> {
       label: "Select a save:",
       options: this.props.saves.map((save) => ({
         name: save.props.name,
-        fn: () => {
-          const player = save.getPlayer(db);
-          const gameMap = player.getGameMap(db)!;
-          const tiles = gameMap.getAllTiles(db);
-          const monsters = gameMap.getMonsters(db);
+        fn: async () => {
+          const loadingPage = new LoadingPage(this.root, this.shell, {
+            action: async (setMessage) => {
+              setMessage("Back into deep darkness you delve.");
 
-          this.replace(
-            new GamePage(this.root, this.shell, {
-              save,
-              player,
-              monsters,
-              gameMap,
-              tiles,
-            })
-          );
+              const player = await save.getPlayer();
+              const gameMap = await player.getGameMap();
+              if (!gameMap) throw new Error("Could not find game map");
+              const tiles = await gameMap.getAllTiles();
+              const monsters = await gameMap.getMonsters();
+
+              const mapTileManager = new MapTileManager(tiles);
+
+              await mapTileManager.setup({ monsters, player });
+
+              return new GamePage(this.root, this.shell, {
+                save,
+                player,
+                monsters,
+                gameMap,
+                tiles,
+                mapTileManager,
+              });
+            },
+          });
+
+          this.replace(loadingPage);
         },
       })),
       textForOption: (option) => option.name,

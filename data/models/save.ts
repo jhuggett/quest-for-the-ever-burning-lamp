@@ -1,4 +1,3 @@
-import Database from "bun:sqlite";
 import { DBTable } from "../table";
 import { GameMap } from "./game-map";
 import { Player } from "./player";
@@ -17,43 +16,41 @@ class SavesTable extends DBTable<CreateSaveProps, SaveProps> {
 }
 
 export class Save {
-  static table(db: Database) {
-    return new SavesTable(db);
-  }
+  static table = new SavesTable();
 
   constructor(public props: SaveProps) {}
 
-  save(db: Database) {
-    Save.table(db).updateRow(this.props.id, this.props);
+  save() {
+    return Save.table.updateRow(this.props.id, this.props);
   }
 
-  static create(db: Database, payload: CreateSaveProps) {
-    const row = Save.table(db).createRow(payload);
+  static async create(payload: CreateSaveProps) {
+    const row = await Save.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created save");
 
     return new Save(row);
   }
 
-  static find(db: Database, id: number) {
-    const row = Save.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await Save.table.getRow(id);
     return new Save(row as SaveProps);
   }
 
-  static all(db: Database) {
-    const rows = Save.table(db).allRows();
+  static async all() {
+    const rows = await Save.table.allRows();
     return rows.map((row) => new Save(row as SaveProps));
   }
 
-  getGameMap(db: Database) {
-    return GameMap.where(db, { save_id: this.props.id })[0];
+  async getGameMap() {
+    return (await GameMap.where({ save_id: this.props.id }))[0];
   }
 
-  getPlayer(db: Database) {
-    return Player.where(db, { save_id: this.props.id })[0];
+  async getPlayer() {
+    return (await Player.where({ save_id: this.props.id }))[0];
   }
 
-  getMonsters(db: Database) {
-    return Monster.where(db, { save_id: this.props.id });
+  getMonsters() {
+    return Monster.where({ save_id: this.props.id });
   }
 }

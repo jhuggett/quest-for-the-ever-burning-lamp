@@ -68,6 +68,11 @@ export class Debug {
 
   registerElement(element: Element<any>) {
     element.renderer = ({ cursor, bounds }) => {
+      cursor.properties.backgroundColor = { r: 14, g: 10, b: 10, a: 1 };
+      cursor.properties.foregroundColor = { r: 25, g: 25, b: 25, a: 1 };
+      cursor.fill(".");
+      cursor.properties.foregroundColor = { r: 200, g: 200, b: 200, a: 1 };
+
       let availableHeight = bounds.height - 1;
 
       for (const log of this.logs) {
@@ -91,7 +96,7 @@ export class Debug {
           break;
         }
 
-        cursor.moveTo({ x: 0, y: availableHeight });
+        cursor.moveTo({ x: 2, y: availableHeight });
 
         try {
           cursor.write(timestamp + " ", {

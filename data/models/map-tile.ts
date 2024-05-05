@@ -1,8 +1,10 @@
-import Database from "bun:sqlite";
+import { db, konsole } from "../..";
 import { DBTable } from "../table";
-import { Exit } from "./exit";
+import { Exit, ExitProps } from "./exit";
 import { GameMap } from "./game-map";
-import { Item } from "./item";
+import { Item, ItemProps } from "./item";
+import { Monster } from "./monster";
+import { Player } from "./player";
 
 type MapTileProps = {
   id: number;
@@ -25,20 +27,60 @@ export class MapTileManager {
     return `${tile.props.x},${tile.props.y}`;
   }
 
-  constructor(public tiles: MapTile[]) {
-    for (const tile of tiles) {
+  constructor(public tiles: MapTile[]) {}
+
+  async setup({ monsters, player }: { monsters: Monster[]; player: Player }) {
+    for (const tile of this.tiles) {
       this.tileMap.set(this.tileKey(tile), tile);
     }
     this.buildAdjacencies();
+
+    for (const monster of monsters) {
+      // to maintain the same tile references
+      const tile = await monster.getTile();
+      const monsterTile = this.getTile(tile.props.x, tile.props.y);
+      if (monsterTile) monster.setTile(monsterTile);
+    }
+
+    const playerTile = await player.getTile();
+    const playerMapTile = this.getTile(playerTile.props.x, playerTile.props.y);
+    if (playerMapTile) player.setTile(playerMapTile);
+
+    const mapId = playerTile.props.game_map_id;
+
+    const items = (await db.do("rawQuery", {
+      query: `select items.*, map_tiles.x,  map_tiles.y from items join map_tiles on items.tile_id = map_tiles.id join game_maps on map_tiles.game_map_id = ${mapId}`,
+    })) as (ItemProps & { x: number; y: number })[];
+
+    for (const item of items) {
+      const mapTile = this.getTile(item.x, item.y);
+      if (mapTile) {
+        mapTile.addCachedItem(new Item(item));
+      }
+    }
+
+    const exits = (await db.do("rawQuery", {
+      query: `select distinct exits.*, map_tiles.x, map_tiles.y from exits join map_tiles on exits.from_map_tile_id = map_tiles.id join game_maps on map_tiles.game_map_id = ${mapId}`,
+    })) as (ExitProps & { x: number; y: number })[];
+
+    // The problem is that x and y are also being added to the exit props so when it tries to save
+    // it fails because it's trying to save x and y as well which don't exist on the actual exits table.
+
+    for (const exit of exits) {
+      const mapTile = this.getTile(exit.x, exit.y);
+      if (mapTile) {
+        mapTile.setCachedExit(new Exit(exit));
+      }
+    }
   }
 
   getTile(x: number, y: number) {
     return this.tileMap.get(`${x},${y}`);
   }
 
-  saveAll(db: Database) {
+  saveAll() {
     for (const tile of this.tiles) {
-      tile.save(db);
+      tile.save();
     }
   }
 
@@ -91,32 +133,30 @@ export class MapTile {
 
   isOccupied = false;
 
-  static table(db: Database) {
-    return new MapTilesTable(db);
-  }
+  static table = new MapTilesTable();
 
   constructor(public props: MapTileProps) {}
 
-  static create(db: Database, payload: CreateMapTileProps) {
-    const row = MapTile.table(db).createRow(payload);
+  static async create(payload: CreateMapTileProps) {
+    const row = await MapTile.table.createRow(payload);
 
     if (row === null) throw new Error("Could not find created MapTile");
 
     return new MapTile(row);
   }
 
-  static find(db: Database, id: number) {
-    const row = MapTile.table(db).getRow(id);
+  static async find(id: number) {
+    const row = await MapTile.table.getRow(id);
     return new MapTile(row as MapTileProps);
   }
 
-  static all(db: Database) {
-    const rows = MapTile.table(db).allRows();
+  static async all() {
+    const rows = await MapTile.table.allRows();
     return rows.map((row) => new MapTile(row as MapTileProps));
   }
 
-  static where(db: Database, props: Partial<MapTileProps>) {
-    const rows = MapTile.table(db).where(props);
+  static async where(props: Partial<MapTileProps>) {
+    const rows = await MapTile.table.where(props);
     return rows.map((row) => new MapTile(row as MapTileProps));
   }
 
@@ -137,16 +177,16 @@ export class MapTile {
     return tiles;
   }
 
-  save(db: Database) {
-    MapTile.table(db).updateRow(this.props.id, this.props);
+  save() {
+    return MapTile.table.updateRow(this.props.id, this.props);
   }
 
   private _attachedExit?: Exit | null;
-  attachedExit(db: Database): Exit | null {
+  async attachedExit() {
     if (this._attachedExit === undefined) {
       // NOTE: this won't show an exit if you're on the other side of it,
       // we'd need to also check the to_map_tile_id.
-      const exits = Exit.table(db).where({ from_map_tile_id: this.props.id });
+      const exits = await Exit.table.where({ from_map_tile_id: this.props.id });
       if (exits.length > 0) {
         this._attachedExit = new Exit(exits[0]);
       } else {
@@ -157,23 +197,42 @@ export class MapTile {
     return this._attachedExit;
   }
 
+  get cachedAttachedExit() {
+    return this._attachedExit;
+  }
+
+  setCachedExit(exit: Exit) {
+    this._attachedExit = exit;
+  }
+
   private _items: Item[] | undefined;
-  getItems(db: Database) {
+  async getItems() {
     if (this._items === undefined) {
-      this._items = Item.table(db)
-        .where({ tile_id: this.props.id })
-        .map((row) => new Item(row));
+      this._items = (await Item.table.where({ tile_id: this.props.id })).map(
+        (row) => new Item(row)
+      );
     }
     return this._items;
   }
 
-  refetchItems(db: Database) {
-    this._items = undefined;
-    return this.getItems(db);
+  get cachedItems() {
+    return this._items;
   }
 
-  getGameMap(db: Database) {
-    return GameMap.table(db).getRow(this.props.game_map_id);
+  addCachedItem(item: Item) {
+    if (this._items === undefined) {
+      this._items = [];
+    }
+    this._items.push(item);
+  }
+
+  refetchItems() {
+    this._items = undefined;
+    return this.getItems();
+  }
+
+  getGameMap() {
+    return GameMap.table.getRow(this.props.game_map_id);
   }
 
   adjacentUp: MapTile | undefined | null;
