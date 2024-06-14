@@ -53,4 +53,8 @@ export class Save {
   getMonsters() {
     return Monster.where({ save_id: this.props.id });
   }
+
+  delete() {
+    return Save.table.deleteRow(this.props.id);
+  }
 }

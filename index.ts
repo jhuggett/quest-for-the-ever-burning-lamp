@@ -19,7 +19,7 @@ shell.onWindowResize(() => {
   shell.render();
 });
 
-const debugMode = true;
+const debugMode = false;
 
 let content = root.createChildElement(() => {
   return {

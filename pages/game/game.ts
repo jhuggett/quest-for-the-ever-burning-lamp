@@ -9,11 +9,104 @@ import { Player } from "../../data/models/player";
 import { GameMap } from "../../data/models/game-map";
 import { SubscribableEvent } from "@jhuggett/terminal/subscribable-event";
 import { OutOfBoundsError } from "@jhuggett/terminal/cursors/cursor";
-import { randomlyGet } from "../main-menu/new-game";
 import { Item } from "../../data/models/item";
 import { LoadingPage } from "../loading-page";
 import { Element } from "@jhuggett/terminal/elements/element";
 import { PauseMenu } from "./pause-menu";
+import { DialogNode, DialogPage } from "../dialog";
+
+/*
+
+Starts with
+You stand before the entrance to a cavern. It is dark outside.
+Scrawled on the wall is a message: "Descend into the darkness to find the Ever-Burning Lamp. Upon the 7th level, you will find it. Beware."
+What do you do?
+
+> Brave the darkness, enter the cavern | this starts the game like normal
+> Flee like a coward | this is the only actual win condition
+
+Then when in the cavern:
+Within the cavern you stand, your lantern flickering. The darkness is oppressive. Red eyes gleam in the darkness.
+You hear the shuffling of feet. Deserted lamps dot the ground (show oil icon), Perhaps the still hold oil. 
+
+> Continue
+
+There is no turning back now. Find the stairs down to the next level (show stairs icon).
+
+> Continue
+
+___ 
+
+Each decent, a shady figure appears. Offers you a deal, lead you directly to the next level. 
+Toss of a coin, you win you get to the next level, you lose it takes your lamp. 
+
+> Heads
+> Tails
+> Refuse the offer and continue on your own
+
+On the seventh level, you find the Ever-Burning Lamp. But the figure is there, waiting. You cannot win.
+*/
+
+// const nextLevelDialog: DialogNode = {
+//   prompt:
+//     "Each decent, a shady figure appears. Offers you a deal, lead you directly to the next level. Toss of a coin, you win you get to the next level, you lose it takes your lamp.",
+// };
+
+export const gameOver = async () => {
+  const save = (await Save.all())?.[0];
+
+  if (save) {
+    await save.delete();
+  }
+};
+
+const nextLevelDialog: (nextLevel: (page: Page<any>) => void) => DialogNode = (
+  nextLevel: (page: Page<any>) => void
+) => ({
+  prompt: `A shady figure appears. Offers you a deal, lead you directly to the next level. Toss of a coin, you win you get to the next level, you lose it takes your lamp.`,
+  options: [
+    {
+      option: "Heads",
+      method(page) {
+        return {
+          prompt: "You lose, it takes your lamp.",
+          options: [
+            {
+              option: "Continue",
+              async method(page) {
+                await gameOver();
+                page.pop();
+              },
+            },
+          ],
+        };
+      },
+    },
+    {
+      option: "Tails",
+      method(page) {
+        return {
+          prompt: "You lose, it takes your lamp.",
+          options: [
+            {
+              option: "Continue",
+              async method(page) {
+                await gameOver();
+                page.pop();
+              },
+            },
+          ],
+        };
+      },
+    },
+    {
+      option: "Refuse the offer and continue on your own",
+      method(page) {
+        nextLevel(page);
+      },
+    },
+  ],
+});
 
 class Color implements RGB {
   constructor(
@@ -147,8 +240,10 @@ class Game {
             });
           } else {
             if (tile.cachedAttachedExit) {
-              cursor.write("  ", {
-                backgroundColor: new Color(250, 0, 0).darkenTo(tileBrightness),
+              cursor.write("▙▁", {
+                // Exit
+                backgroundColor: new Color(10, 10, 5).darkenTo(tileBrightness),
+                foregroundColor: new Color(100, 100, 90),
               });
             } else {
               if (tile.cachedItems && tile.cachedItems.length > 0) {
@@ -166,7 +261,7 @@ class Game {
                     break;
                   case "oil": // ▗▖ ▐▍
                     cursor.write("▗▖", {
-                      foregroundColor: new Color(200, 110, 130).darkenTo(
+                      foregroundColor: new Color(184, 115, 51).darkenTo(
                         tileBrightness
                       ),
                       backgroundColor: new Color(220, 210, 200).darkenTo(
@@ -233,52 +328,52 @@ class Game {
 
     view.render();
 
-    const statsView = view.createChildElement(
-      () =>
-        within(view, {
-          height: 5,
-          paddingTop: 1,
-          paddingLeft: 2,
-          paddingRight: 2,
-        }),
-      {}
-    );
+    // const statsView = view.createChildElement(
+    //   () =>
+    //     within(view, {
+    //       height: 5,
+    //       paddingTop: 1,
+    //       paddingLeft: 2,
+    //       paddingRight: 2,
+    //     }),
+    //   {}
+    // );
 
-    statsView.renderer = ({ cursor }) => {
-      cursor.properties.backgroundColor = { r: 20, g: 30, b: 30, a: 0.9 };
-      cursor.fill(" ");
-      cursor.moveTo({ x: 2, y: 1 });
+    // statsView.renderer = ({ cursor }) => {
+    //   cursor.properties.backgroundColor = { r: 20, g: 30, b: 30, a: 0.9 };
+    //   cursor.fill(" ");
+    //   cursor.moveTo({ x: 2, y: 1 });
 
-      cursor.properties.bold = true;
+    //   cursor.properties.bold = true;
 
-      cursor.write(`${this.gameLoop.isRunning ? "Running" : "Paused"}`);
+    //   cursor.write(`${this.gameLoop.isRunning ? "Running" : "Paused"}`);
 
-      cursor.write(" | ");
+    //   cursor.write(" | ");
 
-      cursor.write(`View Radius: ${player.props.view_radius.toFixed(2)}`);
+    //   cursor.write(`View Radius: ${player.props.view_radius.toFixed(2)}`);
 
-      cursor.write(" | ");
+    //   cursor.write(" | ");
 
-      cursor.write(`Save: ${save.props.name}`);
+    //   cursor.write(`Save: ${save.props.name}`);
 
-      cursor.write(" | ");
+    //   cursor.write(" | ");
 
-      cursor.write(`Level: ${gamePage.props.gameMap.props.level}`);
+    //   cursor.write(`Level: ${gamePage.props.gameMap.props.level}`);
 
-      cursor.write(" | ");
+    //   cursor.write(" | ");
 
-      cursor.write(`Monsters: ${monsters.length}`);
+    //   cursor.write(`Monsters: ${monsters.length}`);
 
-      cursor.write(" | ");
+    //   cursor.write(" | ");
 
-      cursor.write(`Tiles: ${tiles.length}`);
-    };
+    //   cursor.write(`Tiles: ${tiles.length}`);
+    // };
 
-    statsView.render();
+    // statsView.render();
 
-    this.gameLoop.onPausedChange.subscribe((paused) => {
-      statsView.render();
-    });
+    // this.gameLoop.onPausedChange.subscribe((paused) => {
+    //   statsView.render();
+    // });
 
     this.gameLoop.addLoop({
       interval: 50,
@@ -303,7 +398,7 @@ class Game {
       callback: () => {
         player.props.view_radius = Math.max(0, player.props.view_radius - 0.1);
 
-        statsView.render();
+        //statsView.render();
       },
     });
 
@@ -341,46 +436,67 @@ class Game {
         if (potentialTileExit) {
           this.gameLoop.stop();
 
-          const loadingPage = new LoadingPage(gamePage.root, gamePage.shell, {
-            action: async (setMessage) => {
-              setMessage("You descend ever deeper into the darkness.");
+          gamePage.replace(
+            new DialogPage(gamePage.root, gamePage.shell, {
+              dialog: nextLevelDialog((page) => {
+                const loadingPage = new LoadingPage(
+                  gamePage.root,
+                  gamePage.shell,
+                  {
+                    action: async (setMessage) => {
+                      setMessage("You descend ever deeper into the darkness.");
 
-              konsole.log("general", "info", "Generating next level");
-              const gameMap = await potentialTileExit.getToMap();
+                      konsole.log("general", "info", "Generating next level");
+                      const gameMap = await potentialTileExit.getToMap();
 
-              konsole.log("general", "info", "Generating next level tiles");
-              const { monsters, tiles } = await gameMap.generateLevel(save);
+                      konsole.log(
+                        "general",
+                        "info",
+                        "Generating next level tiles"
+                      );
+                      const { monsters, tiles } = await gameMap.generateLevel(
+                        save
+                      );
 
-              // choose entrance
-              const entranceTile = randomlyGet(
-                tiles.filter((tile) => !tile.isTraversable())
-              );
-              potentialTileExit.props.to_map_tile_id = entranceTile.props.id;
-              konsole.log("general", "info", "Saving exit");
-              await potentialTileExit.save();
+                      // choose entrance
+                      const entranceTile = randomlyGet(
+                        tiles.filter((tile) => !tile.isTraversable())
+                      );
+                      potentialTileExit.props.to_map_tile_id =
+                        entranceTile.props.id;
+                      konsole.log("general", "info", "Saving exit");
+                      await potentialTileExit.save();
 
-              // place player
-              player.setTile(entranceTile);
-              konsole.log("general", "info", "Saving player");
-              await player.save();
+                      // place player
+                      player.setTile(entranceTile);
+                      konsole.log("general", "info", "Saving player");
+                      await player.save();
 
-              const mapTileManager = new MapTileManager(tiles);
-              konsole.log("general", "info", "Setting up map tile manager");
-              await mapTileManager.setup({ monsters, player });
+                      const mapTileManager = new MapTileManager(tiles);
+                      konsole.log(
+                        "general",
+                        "info",
+                        "Setting up map tile manager"
+                      );
+                      await mapTileManager.setup({ monsters, player });
 
-              konsole.log("general", "info", "Returning game page");
-              return new GamePage(gamePage.root, gamePage.shell, {
-                save,
-                player,
-                gameMap,
-                tiles,
-                monsters,
-                mapTileManager,
-              });
-            },
-          });
+                      konsole.log("general", "info", "Returning game page");
+                      return new GamePage(gamePage.root, gamePage.shell, {
+                        save,
+                        player,
+                        gameMap,
+                        tiles,
+                        monsters,
+                        mapTileManager,
+                      });
+                    },
+                  }
+                );
 
-          gamePage.replace(loadingPage);
+                page.replace(loadingPage);
+              }),
+            })
+          );
 
           return;
         }
@@ -473,4 +589,8 @@ export class GamePage extends Page<GamePageProps> {
       game.focus();
     });
   }
+}
+
+export function randomlyGet<T>(array: T[]): T {
+  return array[Math.floor(Math.random() * array.length)];
 }

@@ -1,7 +1,8 @@
 import { gray } from "@jhuggett/terminal";
 import { Element } from "@jhuggett/terminal/elements/element";
-import { konsole } from "../..";
 import { GamePage } from "./game";
+import { SelectComponent } from "../../components/select/select";
+import { within } from "@jhuggett/terminal/bounds/bounds";
 
 export class PauseMenu {
   open: boolean = false;
@@ -21,22 +22,14 @@ export class PauseMenu {
           y: view.bounds.globalEnd.y,
         },
       };
-
-      konsole.log("general", "info", bounds);
-
       return bounds;
     }, {});
 
     this.menuBox.renderer = ({ cursor }) => {
-      //if (!this.open) return;
-
-      konsole.log("general", "info", "Rendering pause menu");
+      if (!this.open) return;
 
       cursor.properties.backgroundColor = gray(0, 0.95);
       cursor.fill(" ");
-
-      cursor.moveTo({ x: 2, y: 2 });
-      cursor.write("Paused");
     };
 
     this.menuBox.on("Escape", () => {
@@ -49,54 +42,85 @@ export class PauseMenu {
       return "stop propagation";
     });
 
-    this.menuBox.on("q", () => {
-      gamePage.pop();
-
-      return "stop propagation";
-    });
-
-    const menu = this.menuBox.createChildElement(() => {
+    const menuAccent = this.menuBox.createChildElement(() => {
       const menuBox = this.menuBox;
 
       if (!menuBox) {
         throw new Error("Menu box not found");
       }
 
+      const width = 25;
+      const height = 7;
+
+      const centerX = Math.floor(
+        menuBox.bounds.globalStart.x + menuBox.bounds.width / 2
+      );
+      const centerY = Math.floor(
+        menuBox.bounds.globalStart.y + menuBox.bounds.height / 2
+      );
+
       const bounds = {
         start: {
-          x: Math.floor(
-            menuBox.bounds.globalStart.x + menuBox.bounds.width / 4
-          ),
-          y: Math.floor(
-            menuBox.bounds.globalStart.y + menuBox.bounds.height / 3
-          ),
+          x: Math.floor(centerX - width / 2),
+          y: Math.floor(centerY - height / 2),
         },
         end: {
-          x: Math.floor(menuBox.bounds.globalEnd.x - menuBox.bounds.width / 4),
-          y: Math.floor(menuBox.bounds.globalEnd.y - menuBox.bounds.height / 3),
+          x: Math.floor(centerX + width / 2),
+          y: Math.floor(centerY + height / 2),
         },
       };
 
       return bounds;
     }, {});
 
+    menuAccent.renderer = ({ cursor }) => {
+      cursor.properties.backgroundColor = gray(0.1, 0.9);
+      cursor.fill(" ");
+    };
+
+    const menu = this.menuBox.createChildElement(
+      () => within(menuAccent, { padding: 2 }),
+      {}
+    );
+
     menu.renderer = ({ cursor }) => {
       cursor.properties.backgroundColor = gray(0.1, 0.95);
       cursor.fill(" ");
-
-      cursor.moveTo({ x: 2, y: 2 });
-      cursor.write("Menu");
     };
+
+    const select = new SelectComponent({
+      container: menu,
+      options: [
+        {
+          name: "Resume",
+          fn: () => {
+            this.open = false;
+            this.menuBox?.render();
+            onResume();
+          },
+        },
+        {
+          name: "Quit",
+          fn: () => {
+            gamePage.pop();
+          },
+        },
+      ],
+      textForOption: (option) => option.name,
+      onSelect: (option) => option.fn?.(),
+    });
 
     this.render = () => {
       this.menuBox?.render();
       menu.render();
+
+      select.element.render();
+      select.element.focus();
     };
   }
 
   show() {
     this.open = true;
     this.render?.();
-    this.menuBox?.focus();
   }
 }

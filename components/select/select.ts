@@ -75,8 +75,6 @@ export class SelectComponent<T> {
       }
     };
 
-    this.element.render();
-
     this.element.on("Arrow Up", () => {
       if (this.selectedIndex === 0) {
         this.selectedIndex = this.filteredOptions.length - 1;
@@ -125,5 +123,13 @@ export class SelectComponent<T> {
   destroy() {
     this.element.destroy();
     this.element.clear();
+  }
+
+  resetOptions(options: T[]) {
+    if (options) {
+      this.props.options = options;
+    }
+    this.filter();
+    this.element.render();
   }
 }

@@ -4,10 +4,10 @@ import { MapTile } from "./map-tile";
 import { XY } from "@jhuggett/terminal/xy";
 import { Monster, MonsterProps } from "./monster";
 import { Exit } from "./exit";
-import { randomlyGet } from "../../pages/main-menu/new-game";
 import { Save } from "./save";
 import { Item } from "./item";
 import { konsole } from "../..";
+import { randomlyGet } from "../../pages/game/game";
 
 type GameMapProps = {
   id: number;

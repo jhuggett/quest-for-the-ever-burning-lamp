@@ -3,5 +3,5 @@ create table items (
   item_type string not null,
   tile_id integer not null,
 
-  foreign key(tile_id) references map_tiles(id)
+  foreign key(tile_id) references map_tiles(id) on delete cascade
 )

@@ -4,5 +4,5 @@ create table map_tiles (
     y         integer not null,
     is_wall  boolean not null,
     game_map_id    integer not null,
-    foreign key(game_map_id) references game_maps(id)
+    foreign key(game_map_id) references game_maps(id) on delete cascade
 );
