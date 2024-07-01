@@ -3,6 +3,7 @@
 |/|----------------------------------------------------------------------------------------|/|
 |\|                           Quest for the Everburning Lamp                               |\|
 |/|                                --- Player Manuel ---                                   |/|
+|/|   Instructions:                                                                        |/|
 |\|                                                                                        |\|
 |/|   1. You are an adventurer seeking the famed Lamp.                                     |/|
 |\|                                                                                        |\|
@@ -19,11 +20,11 @@
 |/|   7. Great treasure awaits, fame and fortune are within your grasp!                    |/|
 |\|                                                                                        |\|
 |/|                                                                                        |/|
-|\|                                                                                        |\|
+|\|   Controls:                                                                            |\|
 |/|                                                                                        |/|
-|\|                                                                                        |\|
+|\|   1. Arrow keys to move or change menu selections                                      |\|
 |/|                                                                                        |/|
-|\|                                                                                        |\|
+|\|   2. ESC to pause game                                                                 |\|
 |/|                                                                                        |/|
 |\|                                                                                        |\|
 |/|                                                                                        |/|

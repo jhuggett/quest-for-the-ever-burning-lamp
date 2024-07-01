@@ -93,7 +93,7 @@ export class GameMap {
 
     while (
       growthPoints.length > 0 &&
-      grownPoints.length < 1000 + 1000 * this.props.level
+      grownPoints.length < 1000 + 500 * this.props.level
     ) {
       let nextGrowthPoints: XY[] = [];
 

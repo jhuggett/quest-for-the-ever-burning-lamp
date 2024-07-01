@@ -1,4 +1,5 @@
 import { Element, OutOfBoundsError } from "@jhuggett/terminal/elements/element";
+import { debugMode } from ".";
 
 const LogLevels = [
   {

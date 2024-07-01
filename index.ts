@@ -102,11 +102,12 @@ export const db = await getDBConnection();
 export const konsole = new Debug();
 
 // @ts-ignore
-console = konsole;
-
-console.info("Starting game");
+//console = konsole;
 
 const shell = new BunShell();
+
+shell.overrideRenderBatchSize(2000);
+
 shell.showCursor(false);
 shell.clear();
 
@@ -119,7 +120,7 @@ shell.onWindowResize(() => {
   shell.render();
 });
 
-const debugMode = true;
+export const debugMode = false;
 
 let content = root.createChildElement(() => {
   return {

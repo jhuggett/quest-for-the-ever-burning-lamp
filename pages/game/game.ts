@@ -435,9 +435,10 @@ class Game {
         const untraversableTiles = playerTile
           ?.adjacentTiles()
           .filter((tile) => !tile.isTraversable());
-        if (untraversableTiles && untraversableTiles.length === 4) {
-          console.debug("Player is surrounded");
-
+        if (
+          untraversableTiles &&
+          untraversableTiles.length === playerTile?.adjacentTiles().length
+        ) {
           this.gameLoop.stop();
           gameOver();
 
@@ -458,8 +459,6 @@ class Game {
           gamePage.replace(gameOverDialog);
 
           gameOverDialog.render?.();
-
-          console.debug("Should be done now");
 
           return;
         }
@@ -528,7 +527,7 @@ class Game {
 
                       // choose entrance
                       const entranceTile = randomlyGet(
-                        tiles.filter((tile) => !tile.isTraversable())
+                        tiles.filter((tile) => !tile.props.is_wall)
                       );
                       potentialTileExit.props.to_map_tile_id =
                         entranceTile.props.id;

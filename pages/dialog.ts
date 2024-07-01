@@ -42,7 +42,7 @@ export class DialogPage extends Page<DialogPageProps> {
         within(container, {
           height: linesNeededForText(
             this.currentDialogNode?.prompt || "",
-            this.root.bounds.width
+            container.bounds.width
           ),
         }),
       {}
@@ -55,7 +55,7 @@ export class DialogPage extends Page<DialogPageProps> {
     };
 
     const selectContainer = container.createChildElement(
-      () => below(prompt, within(container, { height: 20 })),
+      () => below(prompt, within(container)),
       {}
     );
 

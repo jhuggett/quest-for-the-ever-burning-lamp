@@ -9,6 +9,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@jhuggett/terminal": "^0.1.3"
+    "@jhuggett/terminal": "^0.1.4"
   }
 }
