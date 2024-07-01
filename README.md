@@ -1,6 +1,8 @@
 # Quest for the Ever-Burning Lamp
 > A Terminal Adventure Game
 
+https://github.com/jhuggett/quest-for-the-ever-burning-lamp/assets/59655877/9a30d595-f10d-4581-bc43-af40049c7904
+
 ## Installation 
 > Note: this game expect Truecolor to be available, see [here](https://github.com/termstandard/colors?tab=readme-ov-file#terminal-emulators) for a list of supported emulators. The game will look very odd without it.
 
