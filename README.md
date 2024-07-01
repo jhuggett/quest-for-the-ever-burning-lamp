@@ -9,3 +9,5 @@ Download the relevant zip (for you platform) from the [latest release](https://g
 Once downloaded, unzip the zip.
 
 Review the `manual.txt`. Run the executable called `game` to play. Game related data is store in a local database that will be colocated with where the executable resides.
+
+This game works on macOS. Windows doesn't seem to work. 
