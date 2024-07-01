@@ -1,16 +1,19 @@
 import Database from "bun:sqlite";
 import {
   DBWorkerRequest,
-  createMigrationsTable,
   isDBWorkerRequest,
+  createMigrationsTable,
   migrate,
-} from "./database";
-
-declare var self: Worker;
+} from "./data/database";
 
 let jobs: DBWorkerRequest<keyof typeof methods>[] = [];
 let isProcessing = false;
 let isReady = false;
+
+export const sendJob = (job: DBWorkerRequest<keyof typeof methods>) => {
+  jobs.push(job);
+  processJobs();
+};
 
 const onMessage = (event: MessageEvent) => {
   if (isDBWorkerRequest(event.data)) {
@@ -19,7 +22,12 @@ const onMessage = (event: MessageEvent) => {
   }
 };
 
-self.addEventListener("message", onMessage);
+var postMessage: (payload: any) => void = () => {};
+export const overridePostMessage = (fn: (payload: any) => void) => {
+  postMessage = fn;
+};
+
+// self.addEventListener("message", onMessage);
 
 const processJobs = () => {
   if (isProcessing || !isReady) {
@@ -35,12 +43,12 @@ const processJobs = () => {
     }
 
     try {
-      self.postMessage({
+      postMessage({
         id: job.id,
         payload: methods[job.method](job.payload as any),
       });
     } catch (error) {
-      self.postMessage({
+      postMessage({
         id: job.id,
         error,
       });
@@ -141,7 +149,7 @@ export const methods = {
   },
   shutdown: () => {
     db.close();
-    self.removeEventListener("message", onMessage);
+    //self.removeEventListener("message", onMessage);
   },
   rawQuery: ({ query }: { query: string }) => {
     return db.query(query).all();

@@ -13,7 +13,7 @@ export class LoaderComponent {
   }>;
   textElement: Element<{ text: string }>;
 
-  frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  frames = [" "];
 
   constructor(public props: Props) {
     const { container } = props;

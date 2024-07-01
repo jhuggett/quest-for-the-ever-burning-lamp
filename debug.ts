@@ -66,6 +66,26 @@ export class Debug {
     }
   }
 
+  debug(message: any) {
+    this.log("general", "debug", message);
+  }
+
+  info(message: any) {
+    this.log("general", "info", message);
+  }
+
+  warning(message: any) {
+    this.log("general", "warning", message);
+  }
+
+  error(message: any) {
+    this.log(
+      "general",
+      "error",
+      message instanceof Error ? message.stack : message
+    );
+  }
+
   registerElement(element: Element<any>) {
     element.renderer = ({ cursor, bounds }) => {
       cursor.properties.backgroundColor = { r: 14, g: 10, b: 10, a: 1 };

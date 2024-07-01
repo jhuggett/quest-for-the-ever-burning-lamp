@@ -60,49 +60,103 @@ export const gameOver = async () => {
   }
 };
 
+const lostLampMessage = () => {
+  return [
+    randomlyGet([
+      "You loose, it grins.",
+      "You loose, it cackles.",
+      "You loose, it whispers.",
+      "You loose, it laughs.",
+      "You loose, it mocks.",
+      "You loose, it sneers.",
+    ]),
+    "It grabs your lamp as it sputters out.",
+    randomlyGet([
+      "You are alone in the dark.",
+      "You are lost in the dark.",
+      "You are trapped in the dark.",
+      "You are doomed in the dark.",
+      "You are forsaken in the dark.",
+      "You are damned in the dark.",
+    ]),
+    randomlyGet([
+      "You see red eyes gleaming in the dark.",
+      "You hear the shuffling of feet.",
+      "You feel the cold breath on your neck.",
+      "You smell the stench of decay.",
+      "You taste the bitterness of fear.",
+    ]),
+    "You are never seen again. Your quest ends here.",
+  ].join(" ");
+};
+
+const surroundedMessage = () => {
+  return [
+    randomlyGet([
+      "You are surrounded.",
+      "You are cornered.",
+      "You are trapped.",
+      "You are encircled.",
+    ]),
+    randomlyGet([
+      "Hands reach out for you.",
+      "Nails scratch at you.",
+      "Teeth gnash at you.",
+      "Eyes glare at you.",
+    ]),
+    "You are never seen again. Your quest ends here.",
+  ].join(" ");
+};
+
+const seventhLevelGameOverMessage = () => {
+  return [
+    `The figure stands before you. "Hark, brave adventurer, you have made it to the seventh level. Great challenges you have overcome; you've escaped peril and have passed through darkness. Alas, this quest is but an invitation to dine, and this level my own dining hall. Find comfort in knowing you too will shuffle these halls forever. Goodnight dear adventurer." It grins a toothy grin. You are never seen again. Your quest ends here.`,
+  ].join(" ");
+};
+
 const nextLevelDialog: (nextLevel: (page: Page<any>) => void) => DialogNode = (
   nextLevel: (page: Page<any>) => void
 ) => ({
-  prompt: `A shady figure appears. Offers you a deal, lead you directly to the next level. Toss of a coin, you win you get to the next level, you lose it takes your lamp.`,
+  prompt: `A shady figure appears. "Win a coin toss and I will take you to the next level, lose and I take your lamp. Have we a deal?"`,
   options: [
-    {
-      option: "Heads",
-      method(page) {
-        return {
-          prompt: "You lose, it takes your lamp.",
-          options: [
-            {
-              option: "Continue",
-              async method(page) {
-                await gameOver();
-                page.pop();
-              },
-            },
-          ],
-        };
-      },
-    },
-    {
-      option: "Tails",
-      method(page) {
-        return {
-          prompt: "You lose, it takes your lamp.",
-          options: [
-            {
-              option: "Continue",
-              async method(page) {
-                await gameOver();
-                page.pop();
-              },
-            },
-          ],
-        };
-      },
-    },
     {
       option: "Refuse the offer and continue on your own",
       method(page) {
         nextLevel(page);
+      },
+    },
+    {
+      option: "Choose Heads",
+      method(page) {
+        return {
+          prompt: "The coin lands on Tails. " + lostLampMessage(),
+          options: [
+            {
+              option: "Continue",
+              async method(page) {
+                await gameOver();
+                page.pop();
+              },
+            },
+          ],
+        };
+      },
+    },
+    {
+      option: "Choose Tails",
+      method(page) {
+        return {
+          prompt: "The coin lands on heads. " + lostLampMessage(),
+          options: [
+            {
+              option: "Continue",
+              async method(page) {
+                await gameOver();
+                page.pop();
+              },
+            },
+          ],
+        };
       },
     },
   ],
@@ -186,6 +240,30 @@ class Game {
 
   mount(view: Element<{}>, gamePage: GamePage, pause: () => void) {
     const { save, monsters, player, tiles, mapTileManager } = gamePage.props;
+
+    // 6
+    if (gamePage.props.gameMap.props.level === 6) {
+      this.gameLoop.stop();
+      gameOver();
+
+      const gameOverDialog = new DialogPage(gamePage.root, gamePage.shell, {
+        dialog: {
+          prompt: seventhLevelGameOverMessage(),
+          options: [
+            {
+              method(page) {
+                page.pop();
+              },
+              option: "Continue",
+            },
+          ],
+        },
+      });
+
+      gamePage.replace(gameOverDialog);
+
+      return;
+    }
 
     this.view = view;
 
@@ -328,53 +406,6 @@ class Game {
 
     view.render();
 
-    // const statsView = view.createChildElement(
-    //   () =>
-    //     within(view, {
-    //       height: 5,
-    //       paddingTop: 1,
-    //       paddingLeft: 2,
-    //       paddingRight: 2,
-    //     }),
-    //   {}
-    // );
-
-    // statsView.renderer = ({ cursor }) => {
-    //   cursor.properties.backgroundColor = { r: 20, g: 30, b: 30, a: 0.9 };
-    //   cursor.fill(" ");
-    //   cursor.moveTo({ x: 2, y: 1 });
-
-    //   cursor.properties.bold = true;
-
-    //   cursor.write(`${this.gameLoop.isRunning ? "Running" : "Paused"}`);
-
-    //   cursor.write(" | ");
-
-    //   cursor.write(`View Radius: ${player.props.view_radius.toFixed(2)}`);
-
-    //   cursor.write(" | ");
-
-    //   cursor.write(`Save: ${save.props.name}`);
-
-    //   cursor.write(" | ");
-
-    //   cursor.write(`Level: ${gamePage.props.gameMap.props.level}`);
-
-    //   cursor.write(" | ");
-
-    //   cursor.write(`Monsters: ${monsters.length}`);
-
-    //   cursor.write(" | ");
-
-    //   cursor.write(`Tiles: ${tiles.length}`);
-    // };
-
-    // statsView.render();
-
-    // this.gameLoop.onPausedChange.subscribe((paused) => {
-    //   statsView.render();
-    // });
-
     this.gameLoop.addLoop({
       interval: 50,
       callback: () => {
@@ -397,6 +428,41 @@ class Game {
       interval: 250,
       callback: () => {
         player.props.view_radius = Math.max(0, player.props.view_radius - 0.1);
+
+        // check if player is surrounded
+        const playerTile = player.cachedTile;
+
+        const untraversableTiles = playerTile
+          ?.adjacentTiles()
+          .filter((tile) => !tile.isTraversable());
+        if (untraversableTiles && untraversableTiles.length === 4) {
+          console.debug("Player is surrounded");
+
+          this.gameLoop.stop();
+          gameOver();
+
+          const gameOverDialog = new DialogPage(gamePage.root, gamePage.shell, {
+            dialog: {
+              prompt: surroundedMessage(),
+              options: [
+                {
+                  method(page) {
+                    page.pop();
+                  },
+                  option: "Continue",
+                },
+              ],
+            },
+          });
+
+          gamePage.replace(gameOverDialog);
+
+          gameOverDialog.render?.();
+
+          console.debug("Should be done now");
+
+          return;
+        }
 
         //statsView.render();
       },
@@ -444,7 +510,9 @@ class Game {
                   gamePage.shell,
                   {
                     action: async (setMessage) => {
-                      setMessage("You descend ever deeper into the darkness.");
+                      setMessage(
+                        "You descend ever deeper into the darkness (loading...)"
+                      );
 
                       konsole.log("general", "info", "Generating next level");
                       const gameMap = await potentialTileExit.getToMap();
@@ -545,18 +613,18 @@ class Game {
       pause();
     });
 
-    view.on("+", () => {
-      player.props.view_radius = 50; // Math.min(50, player.props.view_radius + 0.5);
-      player.save();
-    });
+    // view.on("+", () => {
+    //   player.props.view_radius = 50; // Math.min(50, player.props.view_radius + 0.5);
+    //   player.save();
+    // });
 
-    view.on("p", () => {
-      if (this.gameLoop.isRunning) {
-        this.gameLoop.stop();
-      } else {
-        this.gameLoop.start();
-      }
-    });
+    // view.on("p", () => {
+    //   if (this.gameLoop.isRunning) {
+    //     this.gameLoop.stop();
+    //   } else {
+    //     this.gameLoop.start();
+    //   }
+    // });
 
     this.gameLoop.start();
   }

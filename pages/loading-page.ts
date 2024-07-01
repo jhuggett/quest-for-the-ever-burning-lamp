@@ -12,6 +12,8 @@ export class LoadingPage extends Page<{
       {}
     );
 
+    let loadedPage: Page<unknown> | null = null;
+
     const loader = new LoaderComponent({
       container,
       text: "Loading",
@@ -25,7 +27,7 @@ export class LoadingPage extends Page<{
       .then((page) => {
         loader.stop();
         loader.updateText("Press ANY key to continue.");
-        this.replace(page);
+        loadedPage = page;
       })
       .catch((error) => {
         loader.stop();
@@ -40,5 +42,11 @@ export class LoadingPage extends Page<{
 
         this.pop();
       });
+
+    this.root.on("Any key", () => {
+      if (loadedPage) {
+        this.replace(loadedPage);
+      }
+    });
   }
 }

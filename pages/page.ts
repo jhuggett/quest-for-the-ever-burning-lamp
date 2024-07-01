@@ -11,13 +11,18 @@ export abstract class Page<TProps> {
   private replacePage?: Page<any> | null;
   push(page: Page<any>) {
     this.pushPage = page;
+    this.pageChangedResolver?.();
   }
   pop() {
     this.pushPage = null;
+    this.pageChangedResolver?.();
   }
   replace(page: Page<any>) {
     this.replacePage = page;
+    this.pageChangedResolver?.();
   }
+
+  pageChangedResolver?: () => void;
 
   abstract beforeSetup(): void;
 
@@ -47,7 +52,13 @@ export abstract class Page<TProps> {
       }
 
       this.shell.render();
-      await this.shell.userInteraction();
+
+      const { promise: pageChanged, resolve: pageChangedResolver } =
+        Promise.withResolvers();
+
+      this.pageChangedResolver = pageChangedResolver;
+
+      await Promise.race([this.shell.userInteraction(), pageChanged]);
     }
 
     this.teardown();

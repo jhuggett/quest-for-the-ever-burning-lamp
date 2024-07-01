@@ -1,7 +1,5 @@
-import Database from "bun:sqlite";
 import { DBTable } from "../table";
 import { MapTile, MapTileManager } from "./map-tile";
-import { getVisiblePoints } from "../../shadowcast";
 import { XY } from "@jhuggett/terminal/xy";
 import { calculateFOV } from "../../field-of-view";
 import { GameMap } from "./game-map";

@@ -42,51 +42,12 @@ export class PauseMenu {
       return "stop propagation";
     });
 
-    const menuAccent = this.menuBox.createChildElement(() => {
-      const menuBox = this.menuBox;
-
-      if (!menuBox) {
-        throw new Error("Menu box not found");
-      }
-
-      const width = 25;
-      const height = 7;
-
-      const centerX = Math.floor(
-        menuBox.bounds.globalStart.x + menuBox.bounds.width / 2
-      );
-      const centerY = Math.floor(
-        menuBox.bounds.globalStart.y + menuBox.bounds.height / 2
-      );
-
-      const bounds = {
-        start: {
-          x: Math.floor(centerX - width / 2),
-          y: Math.floor(centerY - height / 2),
-        },
-        end: {
-          x: Math.floor(centerX + width / 2),
-          y: Math.floor(centerY + height / 2),
-        },
-      };
-
-      return bounds;
-    }, {});
-
-    menuAccent.renderer = ({ cursor }) => {
-      cursor.properties.backgroundColor = gray(0.1, 0.9);
-      cursor.fill(" ");
-    };
-
     const menu = this.menuBox.createChildElement(
-      () => within(menuAccent, { padding: 2 }),
+      () => within(this.menuBox!, { paddingLeft: 2 }),
       {}
     );
 
-    menu.renderer = ({ cursor }) => {
-      cursor.properties.backgroundColor = gray(0.1, 0.95);
-      cursor.fill(" ");
-    };
+    menu.renderer = ({ cursor }) => {};
 
     const select = new SelectComponent({
       container: menu,

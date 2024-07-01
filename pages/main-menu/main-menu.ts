@@ -96,16 +96,6 @@ export class MainMenuPage extends Page<void> {
 
     const options = [
       {
-        name: "New Game",
-        fn: async () => {
-          this.push(
-            new DialogPage(this.root, this.shell, {
-              dialog: newGameDialog,
-            })
-          );
-        },
-      },
-      {
         name: "Quit",
         fn: () => {
           this.pop();
@@ -148,10 +138,20 @@ export class MainMenuPage extends Page<void> {
             this.push(loadingPage);
           },
         });
-
-        select.element.render();
-        this.shell.render();
+      } else {
+        options.unshift({
+          name: "New Game",
+          fn: async () => {
+            this.push(
+              new DialogPage(this.root, this.shell, {
+                dialog: newGameDialog,
+              })
+            );
+          },
+        });
       }
+      select.element.render();
+      this.shell.render();
     });
 
     const select = new SelectComponent({

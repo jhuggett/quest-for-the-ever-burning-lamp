@@ -1,7 +1,22 @@
 import { Database } from "bun:sqlite";
 import { readdirSync } from "fs";
 import { join } from "path";
-import { methods } from "./database-worker";
+import { methods } from "../database-worker";
+
+// @ts-ignore
+import migration_1 from "./db-migrations/1_create_save_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_2 from "./db-migrations/2_create_game_maps_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_3 from "./db-migrations/3_create_map_tiles_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_4 from "./db-migrations/4_create_player_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_5 from "./db-migrations/5_create_monster_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_6 from "./db-migrations/6_create_exit_table.sql" with { type: "file" };
+// @ts-ignore
+import migration_7 from "./db-migrations/7_create_items_table.sql" with { type: "file" };
 
 export const createMigrationsTable = (db: Database) => {
   db.run(`
@@ -14,17 +29,25 @@ export const createMigrationsTable = (db: Database) => {
 };
 
 export const migrate = async (db: Database) => {
-  const migrations = readdirSync(join(import.meta.dir, "db-migrations"));
+  const migrations = [
+    {name: "1_create_save_table", file: migration_1},
+    {name: "2_create_game_maps_table", file: migration_2},
+    {name: "3_create_map_tiles_table", file: migration_3},
+    {name: "4_create_player_table", file: migration_4},
+    {name: "5_create_monster_table", file: migration_5},
+    {name: "6_create_exit_table", file: migration_6},
+    {name: "7_create_items_table", file: migration_7},
+  ]
 
   const orderedMigrations = migrations.sort((a, b) => {
-    const aVersion = parseInt(a.split("_")[0]);
-    const bVersion = parseInt(b.split("_")[0]);
+    const aVersion = parseInt(a.name.split("_")[0]);
+    const bVersion = parseInt(b.name.split("_")[0]);
 
     return aVersion - bVersion;
   });
 
   for (const migration of orderedMigrations) {
-    const migrationName = migration.split(".")[0];
+    const migrationName = migration.name.split(".")[0];
 
     const migrationExistsQuery = db.query(
       "SELECT * FROM migrations WHERE name = $migrationName"
@@ -41,7 +64,7 @@ export const migrate = async (db: Database) => {
     }
 
     const migrationFile = Bun.file(
-      join(import.meta.dir, "db-migrations", migration)
+      migration.file
     );
 
     db.run(await migrationFile.text());
@@ -62,7 +85,7 @@ type DBWorkerRejectedResponse = {
   error: any;
 };
 
-const isResolvedResponse = (
+export const isResolvedResponse = (
   response: DBWorkerResolvedResponse | DBWorkerRejectedResponse
 ): response is DBWorkerResolvedResponse => {
   return (
@@ -71,7 +94,7 @@ const isResolvedResponse = (
   );
 };
 
-const isRejectedResponse = (
+export const isRejectedResponse = (
   response: DBWorkerResolvedResponse | DBWorkerRejectedResponse
 ): response is DBWorkerRejectedResponse => {
   return (response as DBWorkerRejectedResponse).error !== undefined;
@@ -91,70 +114,4 @@ export const isDBWorkerRequest = (
     typeof request.method === "string" &&
     typeof request.id === "string"
   );
-};
-
-export class DB {
-  worker: Worker;
-
-  expectingResponses: { id: string; resolve: Function; reject: Function }[] =
-    [];
-
-  async do<T extends keyof typeof methods>(
-    method: T,
-    payload: Parameters<(typeof methods)[T]>[0]
-  ) {
-    const id = Math.random().toString(36).slice(2);
-    this.worker.postMessage({ method, payload, id });
-
-    const { promise, reject, resolve } =
-      Promise.withResolvers<ReturnType<(typeof methods)[T]>>();
-
-    this.expectingResponses.push({ id, resolve, reject });
-
-    return promise;
-  }
-
-  constructor() {
-    this.worker = new Worker(new URL("./database-worker.ts", import.meta.url));
-
-    this.worker.addEventListener("message", (event) => {
-      if (typeof event.data !== "object") {
-        return;
-      }
-
-      if (isResolvedResponse(event.data)) {
-        const response = this.expectingResponses.find(
-          (r) => r.id === event.data.id
-        );
-
-        if (!response) {
-          return;
-        }
-
-        return response.resolve(event.data.payload);
-      }
-
-      if (isRejectedResponse(event.data)) {
-        const response = this.expectingResponses.find(
-          (r) => r.id === event.data.id
-        );
-
-        if (!response) {
-          return;
-        }
-
-        return response.reject(event.data.error);
-      }
-    });
-  }
-
-  async shutdown() {
-    await this.do("shutdown", undefined);
-  }
-}
-
-export const getDBConnection = async () => {
-  const db = new DB();
-
-  return db;
 };

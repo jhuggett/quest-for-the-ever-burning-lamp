@@ -26,9 +26,20 @@ export class DialogPage extends Page<DialogPageProps> {
   beforeSetup() {
     this.currentDialogNode = this.props.dialog;
 
-    const prompt = this.root.createChildElement(
+    const container = this.root.createChildElement(
       () =>
         within(this.root, {
+          height: 20,
+          paddingLeft: 2,
+          paddingTop: 1,
+          paddingRight: 2,
+        }),
+      {}
+    );
+
+    const prompt = container.createChildElement(
+      () =>
+        within(container, {
           height: linesNeededForText(
             this.currentDialogNode?.prompt || "",
             this.root.bounds.width
@@ -38,18 +49,18 @@ export class DialogPage extends Page<DialogPageProps> {
     );
     prompt.renderer = ({ cursor }) => {
       cursor.write(this.currentDialogNode?.prompt || "missing prompt", {
-        foregroundColor: { r: 100, g: 100, b: 255, a: 1 },
+        foregroundColor: { r: 155, g: 125, b: 150, a: 1 },
         bold: true,
       });
     };
 
-    const container = this.root.createChildElement(
-      () => below(prompt, within(this.root, { height: 20, paddingLeft: 2 })),
+    const selectContainer = container.createChildElement(
+      () => below(prompt, within(container, { height: 20 })),
       {}
     );
 
     const select = new SelectComponent({
-      container,
+      container: selectContainer,
       options: this.currentDialogNode?.options.map((option) => ({
         name: option.option,
         fn: () => {
@@ -71,6 +82,9 @@ export class DialogPage extends Page<DialogPageProps> {
     });
 
     this.render = () => {
+      container.recalculateBounds();
+      prompt.recalculateBounds();
+
       prompt.render();
       container.render();
       select.element.render();
